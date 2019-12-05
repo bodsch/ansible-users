@@ -77,7 +77,7 @@
     validate: 'visudo -cf %s'
   environment:
     PATH: /usr/sbin:/usr/local/sbin:/sbin
-  when: item.use_sudo | default(false)
+  when: not item.use_sudo | default(false)
   with_items:
     - "{{ users }}"
   loop_control:

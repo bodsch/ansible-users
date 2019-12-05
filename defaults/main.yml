@@ -1,0 +1,18 @@
+---
+
+default_update_password: on_create
+default_shell: /bin/bash
+
+users: []
+#   - username: bodsch
+#     password: ..
+#     update_password: always
+#     comment: Foo Bar
+#     shell: /bin/bash
+#     ssh_key: |
+#       ssh-rsa ...
+#       ssh-rsa ...
+#     exclusive_ssh_key: true
+#     use_sudo: true
+#     use_sudo_nopass: true
+#     user_state: present

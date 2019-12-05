@@ -1,0 +1,20 @@
+---
+
+dependencies: []
+
+galaxy_info:
+  role_name: ansible-users
+  author: Bodo Schulz
+  description: ansible role to manage users on linux
+  license: MIT
+  min_ansible_version: 2.6
+  platforms:
+    - name: CentOS
+      versions:
+        - all
+    - name: Ubuntu
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all

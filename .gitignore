@@ -1,4 +1,3 @@
 .tox
 __pycache__
-.galaxy_install_info
-*.kate-swp
+molecule/default/roles

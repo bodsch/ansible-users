@@ -1,4 +1,3 @@
-# ansible-users
 
 Role to manage users on linux.
 
@@ -42,7 +41,7 @@ users: []
 File Location: vars/secret
 
 | parameter           | default     |               | description                              |
-| :------------------ | :----:      |               | :-----------   |
+| :------------------ | :----:      | :-----        | :-----------   |
 | `username`          |             | **required**  | username - no spaces  |
 | `uid`               |             | optional      | The numerical value of the user's ID |
 | `user_state`        |             | **required**  | `present` / `lock`  |

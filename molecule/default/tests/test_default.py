@@ -97,12 +97,16 @@ def test_user_bar(host):
 
 # test removed users
 #
+
+
 def test_no_directories(host):
     d = host.file("/home/blonde_feared")
     assert not d.exists
 
 # the home directory should not be exists
 #
+
+
 def test_user_not_exists(host):
     assert not host.group("blonde_feared").exists
     assert not host.user("blonde_feared").exists

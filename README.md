@@ -8,9 +8,10 @@ Add users, change passwords, lock/unlock user accounts, manage sudo access (per 
 
 ## Distros tested
 
-* Ubuntu 18.04 / 16.04
+* Ubuntu 18.04 / 20.04
 * Debian 8 / 9 / 10
 * CentOS 7 / 8
+
 
 ## How to generate password
 

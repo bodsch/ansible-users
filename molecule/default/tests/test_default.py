@@ -51,7 +51,11 @@ def get_vars(host):
 
 
 @pytest.mark.parametrize("dirs", [
-    "/home/foo.bar"
+    "/home/dread_zandra",
+    "/home/etta_ruthless",
+    "/home/etta_ruthless/.ssh",
+    "/home/bodsch",
+    "/home/bodsch/.ssh",
 ])
 def test_directories(host, dirs):
     d = host.file(dirs)
@@ -60,7 +64,9 @@ def test_directories(host, dirs):
 
 
 @pytest.mark.parametrize("files", [
-    "/home/foo.bar/.bashrc"
+    "/home/dread_zandra/.bashrc",
+    "/home/etta_ruthless/.bashrc",
+    "/home/bodsch/.bashrc",
 ])
 def test_files(host, files):
     f = host.file(files)
@@ -68,9 +74,35 @@ def test_files(host, files):
     assert f.is_file
 
 
-def test_user(host):
-    assert host.group("foo.bar").exists
-    assert host.user("foo.bar").exists
-    assert "foo.bar" in host.user("foo.bar").groups
-    assert host.user("foo.bar").shell == "/bin/bash"
-    assert host.user("foo.bar").home == "/home/foo.bar"
+def test_user_foo(host):
+    assert host.group("dread_zandra").exists
+    assert host.user("dread_zandra").exists
+    assert "dread_zandra" in host.user("dread_zandra").groups
+    assert host.user("dread_zandra").shell == "/bin/bash"
+    assert host.user("dread_zandra").home == "/home/dread_zandra"
+    assert host.user("dread_zandra").password == "!"
+
+
+def test_user_bar(host):
+    assert host.group("etta_ruthless").exists
+    assert host.user("etta_ruthless").exists
+    assert "etta_ruthless" in host.user("etta_ruthless").groups
+    assert host.user("etta_ruthless").shell == "/bin/bash"
+    assert host.user("etta_ruthless").home == "/home/etta_ruthless"
+    assert host.user("etta_ruthless").password == "$6$7ILaolIu7Q0VbCVw$JvxT.lIM.bqZ8mioVq6jKQMzNKYTsljB5AXTfFA7IYuWdiSIyYJm43iog6ZxoLx50hEHIpi/DktzUr3pJgGwI."
+
+    key = host.file("/home/etta_ruthless/.ssh/authorized_keys")
+    assert key.exists
+    assert key.mode == 0o600
+
+# test removed users
+#
+def test_no_directories(host):
+    d = host.file("/home/blonde_feared")
+    assert not d.exists
+
+# the home directory should not be exists
+#
+def test_user_not_exists(host):
+    assert not host.group("blonde_feared").exists
+    assert not host.user("blonde_feared").exists

@@ -1,21 +1,32 @@
 
 Role to manage users on linux.
 
+
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/bodsch/ansible-users/CI)][ci]
+[![GitHub issues](https://img.shields.io/github/issues/bodsch/ansible-users)][issues]
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/bodsch/ansible-users)][releases]
+
+[ci]: https://github.com/bodsch/ansible-users/actions
+[issues]: https://github.com/bodsch/ansible-users/issues?q=is%3Aopen+is%3Aissue
+[releases]: https://github.com/bodsch/ansible-users/releases
+
+
 Add users, change passwords, lock/unlock user accounts, manage sudo access (per user), add ssh key(s) for sshkey based authentication.
 
+## Operating systems
 
-**Note:** Deleting users is not done on purpose.
-
-## Distros tested
+Tested on
 
 * Ubuntu 18.04 / 20.04
-* Debian 8 / 9 / 10
-* CentOS 7 / 8
+* Debian 9 / 10
+* CentOS 8
+* OracleLinux 8
+* ArchLinux
 
 
 ## How to generate password
 
-* on Ubuntu - Install "whois" package
+* on Ubuntu - Install `whois` package
 
 ```bash
 mkpasswd --method=SHA-512
@@ -39,7 +50,6 @@ users: []
 
 ## User Settings
 
-File Location: vars/secret
 
 | parameter           | default     |               | description                              |
 | :------------------ | :----:      | :-----        | :-----------   |
@@ -55,3 +65,42 @@ File Location: vars/secret
 | `exclusive_ssh_key` | `false`     | optional      | `true` / `false` <br>**NOTE**: `true` - will remove any ssh keys not defined here! `false` - will add any key specified. |
 | `use_sudo`          | `false`     | optional      | `true` / `false` |
 | `use_sudo_nopass`   | `false`     | optional      | `true` / `false`. set to `true` for passwordless sudo. |
+
+
+## usage
+
+see [molecule tests](molecule/default/converge.yml)
+
+```
+- hosts: all
+  any_errors_fatal: false
+
+  vars:
+    users:
+      - username: bodsch
+        comment: Bodo Schulz
+        password: $6$ptDt6US1NuMioXBL$QVbF04V0Cpj12w1t1YxY7Yw.yqT8RQz1ahT0soYWvJI/1dlZMX19pPXGZn5fn0YQpjS/5ml.sKRCZFt0aPZIa.
+        update_password: on_create
+        shell: /bin/bash
+        ssh_key: |
+          ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
+        exclusive_ssh_key: true
+        use_sudo: true
+        use_sudo_nopass: true
+        user_state: present
+
+      - username: blonde_feared
+        user_state: absent
+
+  roles:
+    - role: ansible-users
+```
+
+## Tests
+
+`tox -e py38-ansible29 -- molecule test`
+
+
+## License
+
+MIT

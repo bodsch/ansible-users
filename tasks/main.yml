@@ -46,6 +46,17 @@
   loop_control:
     label: "username: {{ item.username }}, user_state: {{ item.user_state | default('lock', true) }}"
 
+# add ssh private key
+- name: add ssh private key
+  copy:
+    path: "{{ item.username }}/.ssh/{{ item.ssh_private_key.type }}"
+    content: "{{ item.ssh_private_key.content }}"
+  with_items:
+    - "{{ users }}"
+  when: item.user_state in ('present', 'lock')
+  loop_control:
+    label: "username: {{ item.username }}, user_state: {{ item.user_state | default('lock', true) }}"
+
 # remove account
 - name: remove users
   user:

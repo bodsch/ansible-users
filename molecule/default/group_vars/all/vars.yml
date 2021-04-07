@@ -36,11 +36,10 @@ users:
   #
   - username: dread_zandra
     comment: Dread Pirate Zandra
-    update_password: on_create
-    comment: Foo Bar
-    shell: /bin/bash
-    use_sudo: true
-    use_sudo_nopass: true
+    # update_password: on_create
+    # shell: /bin/bash
+    # use_sudo: true
+    # use_sudo_nopass: true
     user_state: present
   #
   - username: etta_ruthless
@@ -55,4 +54,4 @@ users:
     comment: Blonde Keitha The Feared
     use_sudo: false
     use_sudo_nopass: false
-    user_state: present
+    user_state: absent

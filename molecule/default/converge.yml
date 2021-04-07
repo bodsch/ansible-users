@@ -1,5 +1,5 @@
 ---
-- name: converge
+- name: create users
   hosts: all
   any_errors_fatal: false
 
@@ -10,7 +10,7 @@
     - role: ansible-users
 
 
-- name: converge
+- name: remove user
   hosts: all
   any_errors_fatal: false
 

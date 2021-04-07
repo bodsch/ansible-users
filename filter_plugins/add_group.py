@@ -18,26 +18,26 @@ class FilterModule(object):
         }
 
     def add_primary(self, users, groups):
-        # display.vv("users : ({}) - {}".format(type(users), users))
-        # display.vv("groups: ({}) - {}".format(type(groups), groups))
-
         groups = groups['results']
-
-        # users_count = len(users)
-        # groups_count = len(groups)
-
-        # display.vv("found: {} entries in {}".format(users_count, users))
-        # display.vv("found: {} entries in {}".format(groups_count, groups))
 
         for u in users:
             username = u.get('username')
-            # display.vv("  - user : {}".format(username))
-            for g in groups:
-                primary_group = g.get('ansible_facts').get('getent_group').get(username)
-                if(primary_group):
-                    # display.vv("  - g : {}".format(primary_group[1]))
-                    u['primary_group'] = primary_group[1]
+            user_state = u.get('user_state')
 
-        display.vv("return {}".format(users))
+            display.vv("  - user : {0} / {1}".format(username, user_state))
+
+            if(user_state == 'absent'):
+                continue
+
+            for g in groups:
+                try:
+                    primary_group = g.get('ansible_facts').get('getent_group').get(username)
+                    if(primary_group):
+                        display.vv("  - g : {0}".format(primary_group[1]))
+                        u['primary_group'] = primary_group[1]
+                except Exception:
+                    pass
+
+        display.vvv("return {0}".format(users))
 
         return users

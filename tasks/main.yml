@@ -1,5 +1,19 @@
 ---
 
+- name: Fail when username or user_state are not defined
+  assert:
+    that:
+      - item.username is defined
+      - item.username | length != 0
+      - item.user_state is defined
+      - item.user_state | length != 0
+      - item.user_state in ('present', 'lock', 'absent')
+    quiet: true
+  loop:
+    "{{ users }}"
+  loop_control:
+    label: "username: {{ item.username }}"
+
 - name: add users | create users, shell, home dirs
   user:
     name: "{{ item.username }}"
@@ -13,14 +27,10 @@
     state: "{{ item.user_state }}"
   when:
     - item.user_state in ('present', 'lock')
-  with_items:
-    - "{{ users }}"
+  loop:
+    "{{ users }}"
   loop_control:
-    label: "username: {{ item.username }},
-      user_state: {{ item.user_state if item.user_state is defined else 'lock' }},
-      password: {{ 'True' if item.password is defined else 'False' }},
-      update_password: {{ item.update_password if item.update_password is defined else default_update_password }},
-      groups: {{ item.groups if item.groups is defined else ''}}"  # noqa 204
+    label: "username: {{ item.username }}, user_state: {{ item.user_state }}"
 
 - name: find primary group for user
   getent:
@@ -28,15 +38,18 @@
     key: "{{ item.username }}"
     split: ':'
   register: __getent
-  no_log: true
   when:
     - item.user_state in ('present', 'lock')
-  with_items:
-    - "{{ users }}"
+  loop:
+    "{{ users }}"
+  loop_control:
+    label: "username: {{ item.username }}"
 
 - name: set primary group for users
   set_fact:
     users: "{{ users | add_primary_group(__getent) }}"
+  loop_control:
+    label: "username: {{ item.username }}"
 
 # unlock account if locked
 - name: add users | unlock password login
@@ -45,10 +58,10 @@
     expires: -1
   when:
     - item.user_state == 'present'
-  with_items:
-    - "{{ users }}"
+  loop:
+    "{{ users }}"
   loop_control:
-    label: "username: {{ item.username }}, user_state: {{ item.user_state | default('lock', true) }}"
+    label: "username: {{ item.username }}, user_state: {{ item.user_state }}"
 
 # lock account if not locked
 - name: lock users | lock password & ssh key authentication
@@ -60,7 +73,7 @@
   with_items:
     - "{{ users }}"
   loop_control:
-    label: "username: {{ item.username }}, user_state: {{ item.user_state | default('lock', true) }}"
+    label: "username: {{ item.username }}, user_state: {{ item.user_state }}"
 
 - name: create .ssh directory
   file:
@@ -71,10 +84,10 @@
     mode: 0600
   when:
     - item.user_state in ('present', 'lock')
-  with_items:
-    - "{{ users }}"
+  loop:
+    "{{ users }}"
   loop_control:
-    label: "username: {{ item.username }}, user_state: {{ item.user_state | default('lock', true) }}"
+    label: "username: {{ item.username }}, user_state: {{ item.user_state }}"
 
 # add ssh private key
 - name: add ssh private key
@@ -84,12 +97,13 @@
     owner: "{{ item.0.username }}"
     group: "{{ item.0.primary_group }}"
     mode: 0600
-  no_log: true
-  loop: "{{ users | subelements('ssh_private_key', skip_missing=True) }}"
+  # no_log: true
+  loop:
+    "{{ users | subelements('ssh_private_key', skip_missing=True) }}"
   when:
     - item.0.user_state in ('present', 'lock')
   loop_control:
-    label: "username: {{ item.0.username }}, user_state: {{ item.0.user_state | default('lock', true) }}"
+    label: "username: {{ item.0.username }}, user_state: {{ item.0.user_state }}"
 
 # remove account
 - name: remove users
@@ -101,7 +115,7 @@
   with_items:
     - "{{ users }}"
   loop_control:
-    label: "username: {{ item.username }}, user_state: {{ item.user_state | default('lock', true) }}"
+    label: "username: {{ item.username }}, user_state: {{ item.user_state }}"
 
 - name: remove home directory
   file:
@@ -112,7 +126,7 @@
   with_items:
     - "{{ users }}"
   loop_control:
-    label: "username: {{ item.username }}, user_state: {{ item.user_state | default('lock', true) }}"
+    label: "username: {{ item.username }}, user_state: {{ item.user_state }}"
 
 - name: ssh keys | add authorized key for ssh key authentication
   authorized_key:
@@ -122,13 +136,10 @@
     state: "{{ item.user_state | default('present', true) }}"
   when:
     - item.ssh_key is defined
-  with_items:
-    - "{{ users }}"
+  loop:
+    "{{ users }}"
   loop_control:
-    label: "username: {{ item.username }},
-      ssh_key: {{ 'True' if item.ssh_key is defined else 'False' }},
-      exclusive_ssh_key: {{ item.exclusive_ssh_key if item.exclusive_ssh_key is defined else 'False' }},
-      user_state: {{ item.user_state | default('lock', true) }}"  # noqa 204
+    label: "username: {{ item.username }}, user_state: {{ item.user_state }}"
 
 - name: sudo | add to sudoers file and validate
   lineinfile:
@@ -141,12 +152,10 @@
     PATH: /usr/sbin:/usr/local/sbin:/sbin
   when:
     - item.use_sudo | default(false)
-  with_items:
-    - "{{ users }}"
+  loop:
+    "{{ users }}"
   loop_control:
-    label: "username: {{ item.username }},
-      use_sudo: {{ item.use_sudo|default(false) }},
-      use_sudo_nopass: {{ item.use_sudo_nopass | default(false) }}"
+    label: "username: {{ item.username }}"
 
 - name: sudo | remove from sudoers file and validate
   lineinfile:
@@ -159,7 +168,7 @@
     PATH: /usr/sbin:/usr/local/sbin:/sbin
   when:
     - not item.use_sudo | default(false)
-  with_items:
-    - "{{ users }}"
+  loop:
+    "{{ users }}"
   loop_control:
-    label: "username: {{ item.username }}, use_sudo: {{ item.use_sudo | default(false) }}"
+    label: "username: {{ item.username }}"

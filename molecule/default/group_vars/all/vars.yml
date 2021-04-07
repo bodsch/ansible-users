@@ -1,6 +1,6 @@
 ---
 users:
-  - username: foo.bar
+  - username: foo-bar
     update_password: always
     comment: Foo Bar
     shell: /bin/bash

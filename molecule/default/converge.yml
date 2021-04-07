@@ -6,43 +6,6 @@
   environment:
     NETRC: ''
 
-  vars:
-    users:
-      - username: bodsch
-        comment: Bodo Schulz
-        password: $6$ptDt6US1NuMioXBL$QVbF04V0Cpj12w1t1YxY7Yw.yqT8RQz1ahT0soYWvJI/1dlZMX19pPXGZn5fn0YQpjS/5ml.sKRCZFt0aPZIa.
-        update_password: on_create
-        shell: /bin/bash
-        ssh_key: |
-          ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
-        exclusive_ssh_key: true
-        use_sudo: true
-        use_sudo_nopass: true
-        user_state: present
-      #
-      - username: dread_zandra
-        comment: Dread Pirate Zandra
-        update_password: on_create
-        comment: Foo Bar
-        shell: /bin/bash
-        use_sudo: true
-        use_sudo_nopass: true
-        user_state: present
-      #
-      - username: etta_ruthless
-        comment: Sir Etta Ruthless
-        update_password: on_create
-        password: $6$7ILaolIu7Q0VbCVw$JvxT.lIM.bqZ8mioVq6jKQMzNKYTsljB5AXTfFA7IYuWdiSIyYJm43iog6ZxoLx50hEHIpi/DktzUr3pJgGwI.
-        ssh_key: |
-          ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
-        user_state: present
-      #
-      - username: blonde_feared
-        comment: Blonde Keitha The Feared
-        use_sudo: false
-        use_sudo_nopass: false
-        user_state: present
-
   roles:
     - role: ansible-users
 

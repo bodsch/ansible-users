@@ -10,11 +10,9 @@
     shell: "{{ item.shell if item.shell is defined else default_shell }}"
     createhome: true
     comment: "{{ item.comment if item.comment is defined else '' }}"
-    # hard-coded in case user sets state of absent.
-    # Choice made to never delete accounts!
     state: "{{ item.user_state }}"
   when:
-    - item.user_state == 'present' or item.user_state == 'lock'
+    - item.user_state in ('present', 'lock')
   with_items:
     - "{{ users }}"
   loop_control:
@@ -24,12 +22,29 @@
       update_password: {{ item.update_password if item.update_password is defined else default_update_password }},
       groups: {{ item.groups if item.groups is defined else ''}}"  # noqa 204
 
+- name: find primary group for user
+  getent:
+    database: group
+    key: "{{ item.username }}"
+    split: ':'
+  register: __getent
+  no_log: true
+  when:
+    - item.user_state in ('present', 'lock')
+  with_items:
+    - "{{ users }}"
+
+- name: set primary group for users
+  set_fact:
+    users: "{{ users | add_primary_group(__getent) }}"
+
 # unlock account if locked
 - name: add users | unlock password login
   user:
     name: "{{ item.username }}"
     expires: -1
-  when: item.user_state == 'present'
+  when:
+    - item.user_state == 'present'
   with_items:
     - "{{ users }}"
   loop_control:
@@ -40,7 +55,22 @@
   user:
     name: "{{ item.username }}"
     expires: 0
-  when: item.user_state == 'lock'
+  when:
+    - item.user_state == 'lock'
+  with_items:
+    - "{{ users }}"
+  loop_control:
+    label: "username: {{ item.username }}, user_state: {{ item.user_state | default('lock', true) }}"
+
+- name: create .ssh directory
+  file:
+    path: "/home/{{ item.username }}/.ssh"
+    state: directory
+    owner: "{{ item.username }}"
+    group: "{{ item.primary_group }}"
+    mode: 0600
+  when:
+    - item.user_state in ('present', 'lock')
   with_items:
     - "{{ users }}"
   loop_control:
@@ -49,20 +79,25 @@
 # add ssh private key
 - name: add ssh private key
   copy:
-    path: "{{ item.username }}/.ssh/{{ item.ssh_private_key.type }}"
-    content: "{{ item.ssh_private_key.content }}"
-  with_items:
-    - "{{ users }}"
-  when: item.user_state in ('present', 'lock')
+    dest: "/home/{{ item.0.username }}/.ssh/{{ item.1.type }}"
+    content: "{{ item.1.content }}"
+    owner: "{{ item.0.username }}"
+    group: "{{ item.0.primary_group }}"
+    mode: 0600
+  no_log: true
+  loop: "{{ users | subelements('ssh_private_key', skip_missing=True) }}"
+  when:
+    - item.0.user_state in ('present', 'lock')
   loop_control:
-    label: "username: {{ item.username }}, user_state: {{ item.user_state | default('lock', true) }}"
+    label: "username: {{ item.0.username }}, user_state: {{ item.0.user_state | default('lock', true) }}"
 
 # remove account
 - name: remove users
   user:
     name: "{{ item.username }}"
     state: absent
-  when: item.user_state == 'absent'
+  when:
+    - item.user_state == 'absent'
   with_items:
     - "{{ users }}"
   loop_control:
@@ -72,7 +107,8 @@
   file:
     path: "/home/{{ item.username }}"
     state: absent
-  when: item.user_state == 'absent'
+  when:
+    - item.user_state == 'absent'
   with_items:
     - "{{ users }}"
   loop_control:
@@ -84,7 +120,8 @@
     key: "{{ item.ssh_key }}"
     exclusive: "{{ item.exclusive_ssh_key if item.exclusive_ssh_key is defined else 'no' }}"
     state: "{{ item.user_state | default('present', true) }}"
-  when: item.ssh_key is defined
+  when:
+    - item.ssh_key is defined
   with_items:
     - "{{ users }}"
   loop_control:
@@ -102,7 +139,8 @@
     validate: 'visudo -cf %s'
   environment:
     PATH: /usr/sbin:/usr/local/sbin:/sbin
-  when: item.use_sudo | default(false)
+  when:
+    - item.use_sudo | default(false)
   with_items:
     - "{{ users }}"
   loop_control:
@@ -119,7 +157,8 @@
     validate: 'visudo -cf %s'
   environment:
     PATH: /usr/sbin:/usr/local/sbin:/sbin
-  when: not item.use_sudo | default(false)
+  when:
+    - not item.use_sudo | default(false)
   with_items:
     - "{{ users }}"
   loop_control:

@@ -16,3 +16,4 @@ users: []
 #     use_sudo: true
 #     use_sudo_nopass: true
 #     user_state: present
+#     ssh_private_key: []

@@ -1,9 +1,57 @@
 ---
 users:
-  - username: foo.bar
+  - username: foo-bar
     update_password: always
     comment: Foo Bar
     shell: /bin/bash
+    ssh_private_key:
+      - type: id_ed25519
+        content: |
+          -----BEGIN OPENSSH PRIVATE KEY-----
+          b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABAXYpRZio
+          BDw+o+oic9MwrqAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIK6jjUFopFO9kV4G
+          WIkR0gNzpoaOgpwFFRLWKcpeG8THAAAAkHtt03xiYPgAEc7T0nEtnCjt67sN6msNP2Nxgv
+          +Fd8BANdzbYFzsMoQ45Ldja2gsOt1KAecwO+xY+5BRCA0huWCTHwbd7Y6BqCKLEpHwXWG1
+          UI4GzDt6+hD1LZSbYTFpi+LhiQ1PlrmG5eRQOXzlEAY6AziN7gajlQRsOxkmTW98DuVzWw
+          S/KVZZ/wwzyaIPYQ==
+          -----END OPENSSH PRIVATE KEY-----
+      - type: id_ed25519.pub
+        content: |
+          ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
     use_sudo: true
     use_sudo_nopass: true
     user_state: present
+  #
+  - username: bodsch
+    comment: Bodo Schulz
+    password: $6$ptDt6US1NuMioXBL$QVbF04V0Cpj12w1t1YxY7Yw.yqT8RQz1ahT0soYWvJI/1dlZMX19pPXGZn5fn0YQpjS/5ml.sKRCZFt0aPZIa.
+    update_password: on_create
+    shell: /bin/bash
+    ssh_key: |
+      ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
+    exclusive_ssh_key: true
+    use_sudo: true
+    use_sudo_nopass: true
+    user_state: present
+  #
+  - username: dread_zandra
+    comment: Dread Pirate Zandra
+    # update_password: on_create
+    # shell: /bin/bash
+    # use_sudo: true
+    # use_sudo_nopass: true
+    user_state: present
+  #
+  - username: etta_ruthless
+    comment: Sir Etta Ruthless
+    update_password: on_create
+    password: $6$7ILaolIu7Q0VbCVw$JvxT.lIM.bqZ8mioVq6jKQMzNKYTsljB5AXTfFA7IYuWdiSIyYJm43iog6ZxoLx50hEHIpi/DktzUr3pJgGwI.
+    ssh_key: |
+      ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
+    user_state: present
+  #
+  - username: blonde_feared
+    comment: Blonde Keitha The Feared
+    use_sudo: false
+    use_sudo_nopass: false
+    user_state: absent

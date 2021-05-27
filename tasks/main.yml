@@ -32,6 +32,17 @@
   loop_control:
     label: "username: {{ item.username }}, user_state: {{ item.user_state }}"
 
+- name: fix right for user home
+  file:
+    path: "/home/{{ item.username }}"
+    mode: 0750
+  when:
+    - item.user_state in ('present', 'lock')
+  loop:
+    "{{ users }}"
+  loop_control:
+    label: "username: {{ item.username }}, user_state: {{ item.user_state }}"
+
 - name: find primary group for user
   getent:
     database: group
@@ -81,7 +92,7 @@
     state: directory
     owner: "{{ item.username }}"
     group: "{{ item.primary_group }}"
-    mode: 0600
+    mode: 0700
   when:
     - item.user_state in ('present', 'lock')
   loop:

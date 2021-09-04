@@ -1,7 +1,7 @@
 ---
 
-default_update_password: on_create
-default_shell: /bin/bash
+users_default_update_password: on_create
+users_default_shell: /bin/bash
 
 users: []
 #   - username: bodsch

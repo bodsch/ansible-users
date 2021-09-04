@@ -19,9 +19,9 @@
     name: "{{ item.username }}"
     uid: "{{ item.uid | default(omit, True) }}"
     password: "{{ item.password if item.password is defined else '!' }}"
-    update_password: "{{ item.update_password if item.update_password is defined else default_update_password }}"
+    update_password: "{{ item.update_password if item.update_password is defined else users_default_update_password }}"
     groups: "{{ item.groups | default(omit) }}"
-    shell: "{{ item.shell if item.shell is defined else default_shell }}"
+    shell: "{{ item.shell if item.shell is defined else users_default_shell }}"
     createhome: true
     comment: "{{ item.comment if item.comment is defined else '' }}"
     state: "{{ item.user_state }}"

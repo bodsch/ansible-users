@@ -27,6 +27,7 @@ users:
     password: $6$ptDt6US1NuMioXBL$QVbF04V0Cpj12w1t1YxY7Yw.yqT8RQz1ahT0soYWvJI/1dlZMX19pPXGZn5fn0YQpjS/5ml.sKRCZFt0aPZIa.
     update_password: on_create
     shell: /bin/bash
+    ssh_key_directory: /etc/ssh/authorized_key
     ssh_key: |
       ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
     exclusive_ssh_key: true
@@ -55,3 +56,5 @@ users:
     use_sudo: false
     use_sudo_nopass: false
     user_state: absent
+
+...

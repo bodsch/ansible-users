@@ -139,10 +139,26 @@
   loop_control:
     label: "username: {{ item.username }}, user_state: {{ item.user_state }}"
 
+- name: create directory for authorized key
+  file:
+    state: directory
+    mode: 0755
+    owner: root
+    group: root
+    path: "{{ item.ssh_key_directory }}"
+  when:
+    - item.ssh_key_directory is defined
+    - item.ssh_key_directory | length > 0
+  loop:
+    "{{ users }}"
+  loop_control:
+    label: "username: {{ item.username }}, directory: {{ item.ssh_key_directory | default('') }}"
+
 - name: ssh keys | add authorized key for ssh key authentication
   authorized_key:
     user: "{{ item.username }}"
     key: "{{ item.ssh_key }}"
+    path: "{{ item.ssh_key_directory | default('') }}/{{ item.username }}"
     exclusive: "{{ item.exclusive_ssh_key if item.exclusive_ssh_key is defined else 'no' }}"
     state: "{{ item.user_state | default('present', true) }}"
   when:
@@ -183,3 +199,5 @@
     "{{ users }}"
   loop_control:
     label: "username: {{ item.username }}"
+
+...

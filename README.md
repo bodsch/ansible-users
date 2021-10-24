@@ -17,10 +17,10 @@ Add users, change passwords, lock/unlock user accounts, manage sudo access (per 
 
 Tested on
 
+* Debian 9 / 10 / 11
 * Ubuntu 18.04 / 20.04
-* Debian 9 / 10
-* CentOS 8
-* OracleLinux 8
+* CentOS 7 / 8
+* OracleLinux 7 / 8
 * ArchLinux
 
 

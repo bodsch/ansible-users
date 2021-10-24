@@ -1,0 +1,26 @@
+---
+
+- name: Fail when username or user_state are not defined
+  assert:
+    that:
+      - item.username is defined
+      - item.username | length != 0
+      - item.user_state is defined
+      - item.user_state | length != 0
+      - item.user_state in ('present', 'lock', 'absent')
+    quiet: true
+  loop:
+    "{{ users }}"
+  loop_control:
+    label: "username: {{ item.username }}"
+
+- name: define absent users
+  set_fact:
+    absent_users: "{{ users | user_state(state='absent') }}"
+
+- name: define present users
+  set_fact:
+    present_users: "{{ (users | difference(absent_users)) }}"
+
+
+...

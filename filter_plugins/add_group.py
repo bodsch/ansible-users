@@ -11,10 +11,10 @@ class FilterModule(object):
     """
         Ansible file jinja2 tests
     """
-
     def filters(self):
         return {
             'add_primary_group': self.add_primary,
+            'user_state': self.user_state
         }
 
     def add_primary(self, users, groups):
@@ -41,3 +41,15 @@ class FilterModule(object):
         display.vvv("return {0}".format(users))
 
         return users
+
+    def user_state(self, users, state="absent"):
+        """
+
+        """
+        result = []
+
+        for u in users:
+            if(u.get('user_state', "absent") == 'absent'):
+                result.append(u)
+
+        return result

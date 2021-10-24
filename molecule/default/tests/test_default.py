@@ -91,20 +91,14 @@ def test_user_bar(host):
     assert host.user("etta_ruthless").home == "/home/etta_ruthless"
     assert host.user("etta_ruthless").password == "$6$7ILaolIu7Q0VbCVw$JvxT.lIM.bqZ8mioVq6jKQMzNKYTsljB5AXTfFA7IYuWdiSIyYJm43iog6ZxoLx50hEHIpi/DktzUr3pJgGwI."
 
-    key = host.file("/home/etta_ruthless/.ssh/authorized_keys")
+    key = host.file("/etc/ssh/authorized_key/etta_ruthless")
     assert key.exists
     assert key.mode == 0o600
-
-# test removed users
-#
 
 
 def test_no_directories(host):
     d = host.file("/home/blonde_feared")
     assert not d.exists
-
-# the home directory should not be exists
-#
 
 
 def test_user_not_exists(host):

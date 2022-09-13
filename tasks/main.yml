@@ -5,10 +5,10 @@
   tags:
     - users
 
-- name: remove users
-  include_tasks: remove_users.yaml
-  tags:
-    - users_remove
+#- name: remove users
+#  include_tasks: remove_users.yaml
+#  tags:
+#    - users_remove
 
 - name: add users
   include_tasks: add_users.yaml

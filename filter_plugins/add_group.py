@@ -14,7 +14,8 @@ class FilterModule(object):
     def filters(self):
         return {
             'add_primary_group': self.add_primary,
-            'user_state': self.user_state
+            'user_state': self.user_state,
+            'validate_state': self.validate_state
         }
 
     def add_primary(self, users, groups):
@@ -49,7 +50,21 @@ class FilterModule(object):
         result = []
 
         for u in users:
-            if(u.get('user_state', "absent") == 'absent'):
+            if(u.get('user_state', "absent") == state):
                 result.append(u)
+
+        return result
+
+    def validate_state(self, data):
+        """
+        """
+        result = []
+
+        for u in data:
+            username = u.get("username", None)
+            user_state = u.get("user_state", None)
+
+            if not user_state in ["present", "absent"]:
+                result.append(username)
 
         return result

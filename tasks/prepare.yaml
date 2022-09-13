@@ -1,5 +1,20 @@
 ---
 
+- name: check if user_state are defined and valid
+  set_fact:
+    non_valid_users: "{{ users | validate_state }}"
+
+- name: d
+  debug:
+    msg: "{{ non_valid_users }}"
+
+- name: Fail when username or user_state are not defined
+  assert:
+    that:
+      - non_valid_users is defined
+      - non_valid_users | count != 0
+    quiet: true
+
 - name: Fail when username or user_state are not defined
   assert:
     that:

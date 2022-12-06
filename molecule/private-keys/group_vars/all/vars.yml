@@ -1,0 +1,26 @@
+---
+
+users:
+  - username: foo-bar
+    update_password: always
+    comment: Foo Bar
+    shell: /bin/bash
+    ssh_private_key:
+      - type: id_ed25519
+        content: |
+          -----BEGIN OPENSSH PRIVATE KEY-----
+          b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABAXYpRZio
+          BDw+o+oic9MwrqAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIK6jjUFopFO9kV4G
+          WIkR0gNzpoaOgpwFFRLWKcpeG8THAAAAkHtt03xiYPgAEc7T0nEtnCjt67sN6msNP2Nxgv
+          +Fd8BANdzbYFzsMoQ45Ldja2gsOt1KAecwO+xY+5BRCA0huWCTHwbd7Y6BqCKLEpHwXWG1
+          UI4GzDt6+hD1LZSbYTFpi+LhiQ1PlrmG5eRQOXzlEAY6AziN7gajlQRsOxkmTW98DuVzWw
+          S/KVZZ/wwzyaIPYQ==
+          -----END OPENSSH PRIVATE KEY-----
+      - type: id_ed25519.pub
+        content: |
+          ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
+    use_sudo: true
+    use_sudo_nopass: true
+    user_state: present
+
+...

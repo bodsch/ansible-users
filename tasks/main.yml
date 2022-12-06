@@ -1,17 +1,17 @@
 ---
 
 - name: prepare
-  include_tasks: prepare.yaml
+  ansible.builtin.include_tasks: prepare.yaml
   tags:
     - users
 
 - name: remove users
-  include_tasks: remove_users.yaml
+  ansible.builtin.include_tasks: remove_users.yaml
   tags:
     - users_remove
 
 - name: add users
-  include_tasks: add_users.yaml
+  ansible.builtin.include_tasks: add_users.yaml
   tags:
     - users_add
 

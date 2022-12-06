@@ -1,6 +1,6 @@
 ---
 
-- name: create users
+- name: converge
   hosts: all
   any_errors_fatal: false
 

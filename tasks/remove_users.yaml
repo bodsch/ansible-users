@@ -1,7 +1,7 @@
 ---
 
 - name: remove users
-  user:
+  ansible.builtin.user:
     name: "{{ item.username }}"
     state: absent
   loop:
@@ -10,7 +10,7 @@
     label: "username: {{ item.username }}"
 
 - name: remove home directory
-  file:
+  ansible.builtin.file:
     path: "/home/{{ item.username }}"
     state: absent
   loop:
@@ -19,7 +19,7 @@
     label: "username: {{ item.username }}"
 
 - name: remove central stored authorized keys
-  file:
+  ansible.builtin.file:
     path: "{{ item.ssh_key_directory }}/{{ item.username }}"
     state: absent
   when:
@@ -32,7 +32,7 @@
     label: "username: {{ item.username }}"
 
 - name: remove user sudoers file and validate
-  lineinfile:
+  ansible.builtin.lineinfile:
     dest: /etc/sudoers
     state: absent
     regexp: '^{{ item.username }} '

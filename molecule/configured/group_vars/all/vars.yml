@@ -7,9 +7,9 @@ users:
     update_password: on_create
     shell: /bin/bash
     # this schould be `authorized_keys` ...
-    ssh_key: |
-      ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
-    exclusive_ssh_key: true
+    authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
+    # exclusive_ssh_key: true
     use_sudo: true
     use_sudo_nopass: true
     user_state: present
@@ -26,9 +26,9 @@ users:
     comment: Sir Etta Ruthless
     update_password: on_create
     password: $6$7ILaolIu7Q0VbCVw$JvxT.lIM.bqZ8mioVq6jKQMzNKYTsljB5AXTfFA7IYuWdiSIyYJm43iog6ZxoLx50hEHIpi/DktzUr3pJgGwI.
-    ssh_key_directory: /etc/ssh/authorized_key
-    ssh_key: |
-      ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
+    authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
+    authorized_key_directory: /etc/ssh/authorized_key
     user_state: present
   #
   - username: blonde_feared

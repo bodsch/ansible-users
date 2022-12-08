@@ -2,7 +2,7 @@
 
 - name: create multiple users
   users:
-    users: "{{ present_users }}"
+    users: "{{ users }}"
 
 # - name: create users, with home directories
 #   ansible.builtin.user:

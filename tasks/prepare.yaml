@@ -1,33 +1,33 @@
 ---
 
 - name: check if user_state are defined and valid
-  set_fact:
+  ansible.builtin.set_fact:
     non_valid_users: "{{ users | validate_state }}"
 
 - name: d
-  debug:
-    msg: "{{ non_valid_users }}"
-
-- name: Fail when username or user_state are not defined
-  assert:
-    that:
-      - non_valid_users is defined
-      - non_valid_users | count != 0
-    quiet: true
+  ansible.builtin.debug:
+    msg: "{{ non_valid_users | default([]) }}"
 
 - name: Fail when username or user_state are not defined
   ansible.builtin.assert:
     that:
-      - item.username is defined
-      - item.username | length != 0
-      - item.user_state is defined
-      - item.user_state | length != 0
-      - item.user_state in ('present', 'lock', 'absent')
+      - non_valid_users is defined
+      - non_valid_users | count == 0
     quiet: true
-  loop:
-    "{{ users }}"
-  loop_control:
-    label: "username: {{ item.username }}"
+
+# - name: Fail when username or user_state are not defined
+#   ansible.builtin.assert:
+#     that:
+#       - item.username is defined
+#       - item.username | length != 0
+#       - item.user_state is defined
+#       - item.user_state | length != 0
+#       - item.user_state in ('present', 'lock', 'absent')
+#     quiet: true
+#   loop:
+#     "{{ users }}"
+#   loop_control:
+#     label: "username: {{ item.username }}"
 
 - name: define absent users
   ansible.builtin.set_fact:

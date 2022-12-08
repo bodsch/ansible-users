@@ -6,6 +6,23 @@
 # BSD 2-clause (see LICENSE or https://opensource.org/licenses/BSD-2-Clause)
 
 from __future__ import absolute_import, division, print_function
+from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils._text import to_native
+import hashlib
+import warnings
+import time
+import subprocess
+import socket
+import shutil
+import select
+import re
+import pwd
+import pty
+import os
+import math
+import grp
+import errno
+import calendar
 
 DOCUMENTATION = """
 """
@@ -14,26 +31,6 @@ EXAMPLES = """
 """
 
 # ---------------------------------------------------------------------------------------
-
-
-import calendar
-import errno
-import grp
-import math
-import os
-import pty
-import pwd
-import re
-import select
-import shutil
-import socket
-import subprocess
-import time
-import warnings
-
-from ansible.module_utils._text import to_native
-from ansible.module_utils.basic import AnsibleModule
-
 
 
 try:
@@ -57,17 +54,36 @@ class SingleUser():
     LOGIN_DEFS = '/etc/login.defs'
     DATE_FORMAT = '%Y-%m-%d'
 
-    def __init__(self, module):
+    def __init__(self, user, module):
         """
         """
-        self.state = module.get("state")
-        self.username = module.get("username")
-        self.password = module.get("password")
-        self.home = module.get("home")
-        self.create_home = module.get("create_home")
-        self.comment = module.get("comment")
-        self.local   = module.get("local", False)
+        self.module = module
 
+        self.module.log(msg=f"  user: '{user}'")
+
+        self.state = user.get("state")
+        self.username = user.get("username")
+        self.password = user.get("password")
+        self.home = user.get("home")
+        self.create_home = user.get("create_home", True)
+        self.comment = user.get("comment")
+        self.local   = user.get("local", False)
+        self.uid = user.get("uid", None)
+        self.group = user.get("group", None)
+        self.groups = ",".join(user.get("groups", []))
+        self.shell = user.get("shell", None)
+        self.system = user.get("system", False)
+        self.append = user.get("append", False)
+        self.move_home = user.get("move_home", False)
+
+        self.expires = None
+        self.skeleton = None
+        self.umask = None
+        self.password_lock = user.get("password_lock", False)
+        self.update_password = user.get("update_password", 'always')
+        self.force = user.get("force", False)
+        self.remove = user.get("remove", False)
+        self.seuser = None
 
     def check_password_encrypted(self):
         """
@@ -105,7 +121,6 @@ class SingleUser():
 
             if maybe_invalid:
                 return "The input password appears not to have been hashed.\nThe 'password' argument must be encrypted for this module to work properly."
-
 
     def execute_command(self, cmd, use_unsafe_shell=False, data=None, obey_checkmode=True):
         if self.module.check_mode and obey_checkmode:
@@ -176,8 +191,8 @@ class SingleUser():
         expires = ''
         if HAVE_SPWD:
             try:
-                passwd = spwd.getspnam(self.name)[1]
-                expires = spwd.getspnam(self.name)[7]
+                passwd = spwd.getspnam(self.username)[1]
+                expires = spwd.getspnam(self.username)[7]
                 return passwd, expires
             except KeyError:
                 return passwd, expires
@@ -204,11 +219,10 @@ class SingleUser():
         if os.path.exists(self.SHADOWFILE) and os.access(self.SHADOWFILE, os.R_OK):
             with open(self.SHADOWFILE, 'r') as f:
                 for line in f:
-                    if line.startswith('%s:' % self.name):
+                    if line.startswith('%s:' % self.username):
                         passwd = line.split(':')[1]
                         expires = line.split(':')[self.SHADOWFILE_EXPIRE_INDEX] or -1
         return passwd, expires
-
 
     def create_user(self):
         """
@@ -232,12 +246,15 @@ class SingleUser():
         if self.seuser is not None:
             cmd.append('-Z')
             cmd.append(self.seuser)
+
         if self.group is not None:
             if not self.group_exists(self.group):
                 self.module.fail_json(msg="Group %s does not exist" % self.group)
+
             cmd.append('-g')
             cmd.append(self.group)
-        elif self.group_exists(self.name):
+
+        elif self.group_exists(self.username):
             # use the -N option (no user group) if a group already
             # exists with the same name as the user to prevent
             # errors from useradd trying to create a group when
@@ -315,7 +332,7 @@ class SingleUser():
         if self.system:
             cmd.append('-r')
 
-        cmd.append(self.name)
+        cmd.append(self.username)
         (rc, out, err) = self.execute_command(cmd)
         if not self.local or rc != 0:
             return (rc, out, err)
@@ -326,7 +343,7 @@ class SingleUser():
             else:
                 # Convert seconds since Epoch to days since Epoch
                 lexpires = int(math.floor(self.module.params['expires'])) // 86400
-            (rc, _out, _err) = self.execute_command([lchage_cmd, '-E', to_native(lexpires), self.name])
+            (rc, _out, _err) = self.execute_command([lchage_cmd, '-E', to_native(lexpires), self.username])
             out += _out
             err += _err
             if rc != 0:
@@ -336,7 +353,7 @@ class SingleUser():
             return (rc, out, err)
 
         for add_group in groups:
-            (rc, _out, _err) = self.execute_command([lgroupmod_cmd, '-M', self.name, add_group])
+            (rc, _out, _err) = self.execute_command([lgroupmod_cmd, '-M', self.username, add_group])
             out += _out
             err += _err
             if rc != 0:
@@ -354,7 +371,7 @@ class SingleUser():
             cmd.append('-f')
         if self.remove:
             cmd.append('-r')
-        cmd.append(self.name)
+        cmd.append(self.username)
 
         return self.execute_command(cmd)
 
@@ -471,6 +488,7 @@ class SingleUser():
         # Lock if no password or unlocked, unlock only if locked
         if self.password_lock and not info[1].startswith('!'):
             cmd.append('-L')
+
         elif self.password_lock is False and info[1].startswith('!'):
             # usermod will refuse to unlock a user with no password, module shows 'changed' regardless
             cmd.append('-U')
@@ -489,14 +507,14 @@ class SingleUser():
 
         # skip if no usermod changes to be made
         if len(cmd) > 1:
-            cmd.append(self.name)
+            cmd.append(self.username)
             (rc, out, err) = self.execute_command(cmd)
 
         if not self.local or not (rc is None or rc == 0):
             return (rc, out, err)
 
         if lexpires is not None:
-            (rc, _out, _err) = self.execute_command([lchage_cmd, '-E', to_native(lexpires), self.name])
+            (rc, _out, _err) = self.execute_command([lchage_cmd, '-E', to_native(lexpires), self.username])
             out += _out
             err += _err
             if rc != 0:
@@ -506,19 +524,364 @@ class SingleUser():
             return (rc, out, err)
 
         for add_group in lgroupmod_add:
-            (rc, _out, _err) = self.execute_command([lgroupmod_cmd, '-M', self.name, add_group])
+            (rc, _out, _err) = self.execute_command([lgroupmod_cmd, '-M', self.username, add_group])
             out += _out
             err += _err
             if rc != 0:
                 return (rc, out, err)
 
         for del_group in lgroupmod_del:
-            (rc, _out, _err) = self.execute_command([lgroupmod_cmd, '-m', self.name, del_group])
+            (rc, _out, _err) = self.execute_command([lgroupmod_cmd, '-m', self.username, del_group])
             out += _out
             err += _err
             if rc != 0:
                 return (rc, out, err)
         return (rc, out, err)
+
+    def group_exists(self, group):
+        try:
+            # Try group as a gid first
+            grp.getgrgid(int(group))
+            return True
+        except (ValueError, KeyError):
+            try:
+                grp.getgrnam(group)
+                return True
+            except KeyError:
+                return False
+
+    def _check_usermod_append(self):
+        """
+        """
+        # check if this version of usermod can append groups
+
+        if self.local:
+            command_name = 'lusermod'
+        else:
+            command_name = 'usermod'
+
+        usermod_path = self.module.get_bin_path(command_name, True)
+
+        # for some reason, usermod --help cannot be used by non root
+        # on RH/Fedora, due to lack of execute bit for others
+        if not os.access(usermod_path, os.X_OK):
+            return False
+
+        cmd = [usermod_path, '--help']
+        (rc, data1, data2) = self.execute_command(cmd, obey_checkmode=False)
+        helpout = data1 + data2
+
+        # check if --append exists
+        lines = to_native(helpout).split('\n')
+        for line in lines:
+            if line.strip().startswith('-a, --append'):
+                return True
+
+        return False
+
+    def group_info(self, group):
+        if not self.group_exists(group):
+            return False
+        try:
+            # Try group as a gid first
+            return list(grp.getgrgid(int(group)))
+        except (ValueError, KeyError):
+            return list(grp.getgrnam(group))
+
+    def get_groups_set(self, remove_existing=True):
+        if self.groups is None:
+            return None
+        info = self.user_info()
+
+        groups = set(x.strip() for x in self.groups.split(',') if x)
+
+        for g in groups.copy():
+            if not self.group_exists(g):
+                self.module.fail_json(msg="Group %s does not exist" % (g))
+            if info and remove_existing and self.group_info(g)[2] == info[3]:
+                groups.remove(g)
+        return groups
+
+    def user_group_membership(self, exclude_primary=True):
+        ''' Return a list of groups the user belongs to '''
+        groups = []
+        info = self.get_pwd_info()
+        for group in grp.getgrall():
+            if self.username in group.gr_mem:
+                # Exclude the user's primary group by default
+                if not exclude_primary:
+                    groups.append(group[0])
+                else:
+                    if info[3] != group.gr_gid:
+                        groups.append(group[0])
+
+        return groups
+
+    def create_homedir(self, path):
+        """
+        """
+        if not os.path.exists(path):
+            if self.skeleton is not None:
+                skeleton = self.skeleton
+            else:
+                skeleton = '/etc/skel'
+
+            if os.path.exists(skeleton):
+                try:
+                    shutil.copytree(skeleton, path, symlinks=True)
+                except OSError as e:
+                    self.module.exit_json(failed=True, msg="%s" % to_native(e))
+            else:
+                try:
+                    os.makedirs(path)
+                except OSError as e:
+                    self.module.exit_json(failed=True, msg="%s" % to_native(e))
+            # get umask from /etc/login.defs and set correct home mode
+            if os.path.exists(self.LOGIN_DEFS):
+                with open(self.LOGIN_DEFS, 'r') as f:
+                    for line in f:
+                        m = re.match(r'^UMASK\s+(\d+)$', line)
+                        if m:
+                            umask = int(m.group(1), 8)
+                            mode = 0o777 & ~umask
+                            try:
+                                os.chmod(path, mode)
+                            except OSError as e:
+                                self.module.exit_json(failed=True, msg="%s" % to_native(e))
+
+    def chown_homedir(self, uid, gid, path):
+        try:
+            os.chown(path, uid, gid)
+            for root, dirs, files in os.walk(path):
+                for d in dirs:
+                    os.chown(os.path.join(root, d), uid, gid)
+                for f in files:
+                    os.chown(os.path.join(root, f), uid, gid)
+        except OSError as e:
+            self.module.exit_json(failed=True, msg="%s" % to_native(e))
+
+class UsersHelper():
+    module = None
+
+    def __init__(self, module):
+        """
+          Initialize Variables
+        """
+        self.module = module
+
+
+    def user_info(self):
+        """
+        """
+        self.user_name, _, uid, gid, _, self.user_home, _ = self.user_data.user_info()
+
+        if self.user_name == "root":
+            uid = 0
+            gid = 0
+
+        self.uid = str(uid)
+        self.gid = str(gid)
+
+        self.module.log(msg=f"    - user_name: {self.user_name}, uid: {self.uid}, gid: {self.gid}, home: {self.user_home}")
+
+
+    def create_directory(self, path, mode="0750"):
+        """
+        """
+        self.module.log(msg=f"create directory {path}")
+
+        # if os.path.isdir(path):
+        #    return
+
+        try:
+            os.makedirs(path, exist_ok=True)
+        except FileExistsError:
+            pass
+
+        self.set_rights(path, self.uid, self.gid, mode)
+
+    def remove_directory(self, path):
+        """
+        """
+        self.module.log(msg=f"remove directory {path}")
+
+        for root, dirs, files in os.walk(path, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+
+    def verify_authorized_keys(self, file_name, keys):
+        """
+        """
+        _old_sorted_keys = []
+        _old_checksum = ""
+
+        # file_name = os.path.join(path, "authorized_keys")
+
+        _new_sorted_keys = sorted(keys)
+
+        _new_checksum = self.checksum("|".join(_new_sorted_keys))
+
+        # self.module.log(msg=f"  _checksum: {_new_checksum}")
+
+        """
+          read file to generte checksum
+        """
+        if os.path.isfile(file_name):
+            with open(file_name, 'r') as fp:
+                lines = [line.rstrip() for line in fp]
+                _old_sorted_keys = sorted(lines)
+
+            # self.module.log(msg=f"  lines: {_old_sorted_keys}")
+
+            _old_checksum = self.checksum("|".join(_old_sorted_keys))
+
+            # self.module.log(msg=f"  _checksum: {_old_checksum}")
+
+        result = (_new_checksum == _old_checksum)
+
+        # self.module.log(msg=f"result: {result}")
+
+        return result
+
+    def save_authorized_keys(self, file_name, keys, mode="0750"):
+        """
+        """
+        self.module.log(msg=f"_save_authorized_keys(self, {file_name}, keys, {mode})")
+
+        # file_name = os.path.join(path, "authorized_keys")
+
+        # open file in write mode
+        with open(file_name, 'w') as fp:
+            fp.write("\n".join(str(item) for item in keys))
+
+        self.set_rights(file_name, self.uid, self.gid, mode)
+
+    def checksum(self, plaintext):
+        """
+        """
+        if isinstance(plaintext, dict):
+            password_bytes = json.dumps(plaintext, sort_keys=True).encode('utf-8')
+        else:
+            password_bytes = plaintext.encode('utf-8')
+
+        password_hash = hashlib.sha256(password_bytes)
+        return password_hash.hexdigest()
+
+    def set_rights(self, path, owner = None, group = None, mode = None):
+        """
+        """
+        self.module.log(msg=f"set_rights(self, {path}, {owner} {group}, {mode})")
+
+        if mode is not None:
+            os.chmod(path, int(mode, base=8))
+
+        if owner is not None:
+            try:
+                owner = pwd.getpwnam(owner).pw_uid
+            except KeyError:
+                owner = int(owner)
+                pass
+        else:
+            owner = 0
+
+        if group is not None:
+            try:
+                group = grp.getgrnam(group).gr_gid
+            except KeyError:
+                group = int(group)
+                pass
+        else:
+            group = 0
+
+        os.chown(path, int(owner), int(group))
+
+
+class AuthorizedKeys(UsersHelper):
+    module = None
+
+    def __init__(self, module):
+        """
+          Initialize Variables
+        """
+        UsersHelper.__init__(self, module)
+
+        # self.module = module
+
+        self.authorized_keys = []
+        self.user_data = None
+
+    def user(self, user, auth_keys = []):
+        """
+        """
+        self.authorized_keys = auth_keys
+        self.user_data = user
+
+    def save(self, path = None):
+        """
+        """
+        self.user_info()
+
+        if self.authorized_keys and len(self.authorized_keys) > 0:
+            """
+            """
+            if not path:
+                path = os.path.join(self.user_home, ".ssh")
+                _authorized_key_directory_mode = "0700"
+                _authorized_key_file = os.path.join(path, "authorized_keys")
+
+            else:
+                _authorized_key_directory_mode = "0750"
+                _authorized_key_file = os.path.join(path, self.user_name)
+                # uid = None
+                # gid = None
+
+            self.module.log(msg=f"    - key file: {_authorized_key_file}")
+
+            self.create_directory(path, _authorized_key_directory_mode)
+            # self._create_directory(path=_authorized_key_directory, mode=_authorized_key_directory_mode)
+            # self._create_directory(_authorized_key_directory, str(uid), str(gid), _authorized_key_directory_mode)
+
+            if not self.verify_authorized_keys(_authorized_key_file, self.authorized_keys):
+                # changed keys
+                self.save_authorized_keys(file_name=_authorized_key_file, keys=self.authorized_keys, mode="0600")
+
+    def remove(self, path = None):
+        """
+        """
+        self.user_info()
+
+        if path:
+            """
+            """
+            _authorized_key_file = os.path.join(path, self.user_name)
+            if os.path.isfile(_authorized_key_file):
+                """
+                  remove old  keyfile
+                """
+                os.remove(_authorized_key_file)
+
+
+class SshKeys(UsersHelper):
+    module = None
+
+    def __init__(self, module):
+        """
+          Initialize Variables
+        """
+        UsersHelper.__init__(self, module)
+
+    def user(self, user, ssh_keys = []):
+        """
+        """
+        self.ssh_keys = ssh_keys
+        self.user_data = user
+
+    def save(self):
+        """
+        """
+        pass
 
 
 class Users():
@@ -535,45 +898,68 @@ class Users():
 
         self.users = module.params.get("users")
 
-        # self.state = module.params.get("state")
-        # self.username = module.params.get("username")
-        # self.password = module.params.get("password")
-        # self.home = module.params.get("home")
-        # self.create_home = module.params.get("create_home")
-        # self.comment = module.params.get("comment")
-
-
-
-
     def run(self):
         """
         """
-        for u in self.users:
+        res = {}
 
+        auth_keys = AuthorizedKeys(self.module)
+        ssh_keys = SshKeys(self.module)
+
+        for u in self.users:
+            self.module.log(msg="-----------------------------------------------------------")
+            self.module.log(msg=f"  - {u}")
+
+            result = {}
+
+            _username = u.get("username")
             _state = u.get("user_state")
             _home = u.get("home")
 
+            _authorized_keys = u.get("authorized_keys", [])
+            _ssh_keys = u.get("ssh_keys", [])
+
+            _authorized_key_directory = u.get("authorized_key_directory", None)
+
             m = dict(
                 state = _state,
-                username = u.get("username"),
+                username = _username,
                 password = u.get("password"),
                 home = _home,
+                create_home = u.get("create_home", True),
                 comment = u.get("comment"),
+                uid = u.get("uid", None),
+                group = u.get("group", None),
+                update_password = u.get("update_password", 'always'),
+                shell = u.get("shell", None),
+                authorized_keys = _authorized_keys,
+                ssh_keys = _ssh_keys,
+                force = u.get('force', False),
+                remove = u.get('remove', False),
             )
 
-            user = SingleUser(m)
+            user = SingleUser(m, self.module)
             user.check_password_encrypted()
+
+            user_exists = user.user_exists()
+
+            self.module.log(msg=f"    - user_exists: {user_exists}")
 
             if _state == 'absent':
                 """
                 """
-                if user.user_exists():
-                    if module.check_mode:
-                        module.exit_json(changed=True)
+                if user_exists:
+
+                    if self.module.check_mode:
+                        self.module.exit_json(changed=True)
+
+                    auth_keys.user(user, _authorized_keys)
+                    authorized_keys_state = auth_keys.remove(_authorized_key_directory)
+
                     (rc, out, err) = user.remove_user()
 
                     if rc != 0:
-                        module.fail_json(name=user.name, msg=err, rc=rc)
+                        self.module.fail_json(name=user.username, msg=err, rc=rc)
 
                     result['force'] = user.force
                     result['remove'] = user.remove
@@ -581,11 +967,11 @@ class Users():
             elif _state == 'present':
                 """
                 """
-                if not user.user_exists():
+                if not user_exists:
                     """
                     """
-                    if module.check_mode:
-                        module.exit_json(changed=True)
+                    if self.module.check_mode:
+                        self.module.exit_json(changed=True)
 
                     # Check to see if the provided home path contains parent directories
                     # that do not exist.
@@ -602,10 +988,12 @@ class Users():
                     if path_needs_parents:
                         info = user.user_info()
 
+                        self.module.log(msg=f"    - user info: {info}")
+
                         if info is not False:
                             user.chown_homedir(info[2], info[3], user.home)
 
-                    if module.check_mode:
+                    if self.module.check_mode:
                         result['system'] = user.name
                     else:
                         result['system'] = user.system
@@ -617,19 +1005,162 @@ class Users():
                     result['move_home'] = user.move_home
 
                 if rc is not None and rc != 0:
-                    module.fail_json(name=user.name, msg=err, rc=rc)
+                    self.module.fail_json(name=user.username, msg=err, rc=rc)
 
                 if user.password is not None:
                     result['password'] = 'NOT_LOGGING_PASSWORD'
 
+                auth_keys.user(user, _authorized_keys)
+                authorized_keys_state = auth_keys.save(_authorized_key_directory)
+
+                ssh_keys.user(user, _ssh_keys)
+                ssh_keys_state = ssh_keys.save()
+
+                self.module.log(msg=f"    - authorized_keys_state : {authorized_keys_state}")
+                self.module.log(msg=f"    - ssh_keys_state        : {ssh_keys_state}")
+
+            res[_username] = result
+
+        self.module.log(msg="-----------------------------------------------------------")
+
+        self.module.log(msg=f"  = {res}")
+
+        self.module.log(msg="-----------------------------------------------------------")
+
+        result.update({"failed": False})
+
+        # return result
 
         return dict(
-          failed = True,
-          msg = "development .."
+            failed = True,
+            msg = "development .."
         )
 
+    def _create_directory(self, path, owner = None, group = None, mode="0750"):
+        """
+        """
+        self.module.log(msg=f"create directory {path}")
 
+        # if os.path.isdir(path):
+        #    return
 
+        try:
+            os.makedirs(path, exist_ok=True)
+        except FileExistsError:
+            pass
+
+        if mode is not None:
+            os.chmod(path, int(mode, base=8))
+
+        if owner is not None:
+            try:
+                owner = pwd.getpwnam(owner).pw_uid
+            except KeyError:
+                owner = int(owner)
+                pass
+        else:
+            owner = 0
+
+        if group is not None:
+            try:
+                group = grp.getgrnam(group).gr_gid
+            except KeyError:
+                group = int(group)
+                pass
+        else:
+            group = 0
+
+        os.chown(path, int(owner), int(group))
+
+        return
+
+    def _remove_directory(self, path):
+        """
+        """
+        self.module.log(msg=f"remove directory {path}")
+
+        for root, dirs, files in os.walk(path, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+
+    def _verify_authorized_keys(self, file_name, keys):
+        """
+        """
+        _old_sorted_keys = []
+        _old_checksum = ""
+
+        # file_name = os.path.join(path, "authorized_keys")
+
+        _new_sorted_keys = sorted(keys)
+
+        _new_checksum = self.__checksum("|".join(_new_sorted_keys))
+
+        # self.module.log(msg=f"  _checksum: {_new_checksum}")
+
+        """
+          read file to generte checksum
+        """
+        if os.path.isfile(file_name):
+            with open(file_name, 'r') as fp:
+                lines = [line.rstrip() for line in fp]
+                _old_sorted_keys = sorted(lines)
+
+            # self.module.log(msg=f"  lines: {_old_sorted_keys}")
+
+            _old_checksum = self.__checksum("|".join(_old_sorted_keys))
+
+            # self.module.log(msg=f"  _checksum: {_old_checksum}")
+
+        result = (_new_checksum == _old_checksum)
+
+        # self.module.log(msg=f"result: {result}")
+
+        return result
+
+    def _save_authorized_keys(self, file_name, keys, owner = None, group = None, mode="0750"):
+        """
+        """
+        # file_name = os.path.join(path, "authorized_keys")
+
+        # open file in write mode
+        with open(file_name, 'w') as fp:
+            fp.write("\n".join(str(item) for item in keys))
+
+        if mode is not None:
+            os.chmod(file_name, int(mode, base=8))
+
+        if owner is not None:
+            try:
+                owner = pwd.getpwnam(owner).pw_uid
+            except KeyError:
+                owner = int(owner)
+                pass
+        else:
+            owner = 0
+
+        if group is not None:
+            try:
+                group = grp.getgrnam(group).gr_gid
+            except KeyError:
+                group = int(group)
+                pass
+        else:
+            group = 0
+
+        os.chown(file_name, int(owner), int(group))
+
+    def __checksum(self, plaintext):
+        """
+        """
+        if isinstance(plaintext, dict):
+            password_bytes = json.dumps(plaintext, sort_keys=True).encode('utf-8')
+        else:
+            password_bytes = plaintext.encode('utf-8')
+
+        password_hash = hashlib.sha256(password_bytes)
+        return password_hash.hexdigest()
 
 
 # ---------------------------------------------------------------------------------------

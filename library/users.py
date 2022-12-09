@@ -23,6 +23,8 @@ import math
 import grp
 import errno
 import calendar
+import base64
+import binascii
 
 DOCUMENTATION = """
 """
@@ -660,6 +662,7 @@ class SingleUser():
         except OSError as e:
             self.module.exit_json(failed=True, msg="%s" % to_native(e))
 
+
 class UsersHelper():
     module = None
 
@@ -668,7 +671,6 @@ class UsersHelper():
           Initialize Variables
         """
         self.module = module
-
 
     def user_info(self):
         """
@@ -684,15 +686,9 @@ class UsersHelper():
 
         self.module.log(msg=f"    - user_name: {self.user_name}, uid: {self.uid}, gid: {self.gid}, home: {self.user_home}")
 
-
-    def create_directory(self, path, mode="0750"):
+    def create_directory(self, path, mode="0700"):
         """
         """
-        self.module.log(msg=f"create directory {path}")
-
-        # if os.path.isdir(path):
-        #    return
-
         try:
             os.makedirs(path, exist_ok=True)
         except FileExistsError:
@@ -703,7 +699,7 @@ class UsersHelper():
     def remove_directory(self, path):
         """
         """
-        self.module.log(msg=f"remove directory {path}")
+        # self.module.log(msg=f"remove directory {path}")
 
         for root, dirs, files in os.walk(path, topdown=False):
             for name in files:
@@ -711,52 +707,57 @@ class UsersHelper():
             for name in dirs:
                 os.rmdir(os.path.join(root, name))
 
-    def verify_authorized_keys(self, file_name, keys):
+    def verify_files(self, file_name, data):
         """
         """
-        _old_sorted_keys = []
+        _old_data = ""
         _old_checksum = ""
 
-        # file_name = os.path.join(path, "authorized_keys")
+        def combine_list(d):
+            return "|".join(sorted(d))
 
-        _new_sorted_keys = sorted(keys)
+        data_is_list = isinstance(data, list)
 
-        _new_checksum = self.checksum("|".join(_new_sorted_keys))
+        if data_is_list:
+            data = combine_list(data)
 
-        # self.module.log(msg=f"  _checksum: {_new_checksum}")
+        _new_checksum = self.checksum(data)
 
         """
-          read file to generte checksum
+          read file to generate checksum
         """
         if os.path.isfile(file_name):
-            with open(file_name, 'r') as fp:
-                lines = [line.rstrip() for line in fp]
-                _old_sorted_keys = sorted(lines)
 
-            # self.module.log(msg=f"  lines: {_old_sorted_keys}")
-
-            _old_checksum = self.checksum("|".join(_old_sorted_keys))
-
-            # self.module.log(msg=f"  _checksum: {_old_checksum}")
+            with open(file_name, 'r') as d:
+                if data_is_list:
+                    lines = [line.rstrip() for line in d]
+                    _old_data = combine_list(lines)
+                    _old_checksum = self.checksum(_old_data)
+                else:
+                    _old_data = d.read()
+                    _old_checksum = self.checksum(_old_data)
 
         result = (_new_checksum == _old_checksum)
 
-        # self.module.log(msg=f"result: {result}")
-
         return result
 
-    def save_authorized_keys(self, file_name, keys, mode="0750"):
+    def save_file(self, file_name, data, mode="0600"):
         """
         """
-        self.module.log(msg=f"_save_authorized_keys(self, {file_name}, keys, {mode})")
+        # self.module.log(msg=f"save_file(self, {file_name}, data, {mode})")
+        # self.module.log(msg=f"  - {type(data)}")
 
-        # file_name = os.path.join(path, "authorized_keys")
+        data_is_list = isinstance(data, list)
 
-        # open file in write mode
         with open(file_name, 'w') as fp:
-            fp.write("\n".join(str(item) for item in keys))
+            if data_is_list:
+                fp.write("\n".join(str(item) for item in data))
+            else:
+                fp.write(data)
 
         self.set_rights(file_name, self.uid, self.gid, mode)
+
+        pass
 
     def checksum(self, plaintext):
         """
@@ -772,7 +773,7 @@ class UsersHelper():
     def set_rights(self, path, owner = None, group = None, mode = None):
         """
         """
-        self.module.log(msg=f"set_rights(self, {path}, {owner} {group}, {mode})")
+        # self.module.log(msg=f"set_rights(self, {path}, {owner} {group}, {mode})")
 
         if mode is not None:
             os.chmod(path, int(mode, base=8))
@@ -797,8 +798,21 @@ class UsersHelper():
 
         os.chown(path, int(owner), int(group))
 
+    def is_base64(self, sb):
+        """
+        """
+        try:
+            data = base64.b64decode(sb, validate=True).decode('utf-8')
+        except binascii.Error as e:
+            # self.module.log(msg=f"ERROR  {e}")
+            data = sb
+
+        return data
+
 
 class AuthorizedKeys(UsersHelper):
+    """
+    """
     module = None
 
     def __init__(self, module):
@@ -806,8 +820,6 @@ class AuthorizedKeys(UsersHelper):
           Initialize Variables
         """
         UsersHelper.__init__(self, module)
-
-        # self.module = module
 
         self.authorized_keys = []
         self.user_data = None
@@ -830,22 +842,17 @@ class AuthorizedKeys(UsersHelper):
                 path = os.path.join(self.user_home, ".ssh")
                 _authorized_key_directory_mode = "0700"
                 _authorized_key_file = os.path.join(path, "authorized_keys")
-
             else:
                 _authorized_key_directory_mode = "0750"
                 _authorized_key_file = os.path.join(path, self.user_name)
-                # uid = None
-                # gid = None
 
             self.module.log(msg=f"    - key file: {_authorized_key_file}")
 
             self.create_directory(path, _authorized_key_directory_mode)
-            # self._create_directory(path=_authorized_key_directory, mode=_authorized_key_directory_mode)
-            # self._create_directory(_authorized_key_directory, str(uid), str(gid), _authorized_key_directory_mode)
 
-            if not self.verify_authorized_keys(_authorized_key_file, self.authorized_keys):
+            if not self.verify_files(_authorized_key_file, self.authorized_keys):
                 # changed keys
-                self.save_authorized_keys(file_name=_authorized_key_file, keys=self.authorized_keys, mode="0600")
+                self.save_file(file_name=_authorized_key_file, data=self.authorized_keys, mode="0600")
 
     def remove(self, path = None):
         """
@@ -864,6 +871,8 @@ class AuthorizedKeys(UsersHelper):
 
 
 class SshKeys(UsersHelper):
+    """
+    """
     module = None
 
     def __init__(self, module):
@@ -872,7 +881,10 @@ class SshKeys(UsersHelper):
         """
         UsersHelper.__init__(self, module)
 
-    def user(self, user, ssh_keys = []):
+        self.ssh_keys = {}
+        self.user_data = None
+
+    def user(self, user, ssh_keys = {}):
         """
         """
         self.ssh_keys = ssh_keys
@@ -881,7 +893,21 @@ class SshKeys(UsersHelper):
     def save(self):
         """
         """
-        pass
+        self.user_info()
+
+        path = os.path.join(self.user_home, ".ssh")
+
+        self.create_directory(path, "0700")
+
+        if isinstance(self.ssh_keys, dict):
+            for key, value in self.ssh_keys.items():
+                ssh_key_file = os.path.join(path, key)
+                ssh_key_value = self.is_base64(value)
+
+                if not self.verify_files(ssh_key_file, ssh_key_value):
+                    self.save_file(ssh_key_file, ssh_key_value)
+        else:
+            self.module.log(msg=f"wrong ssh_keys format for user {self.user_name}")
 
 
 class Users():
@@ -917,7 +943,7 @@ class Users():
             _home = u.get("home")
 
             _authorized_keys = u.get("authorized_keys", [])
-            _ssh_keys = u.get("ssh_keys", [])
+            _ssh_keys = u.get("ssh_keys", {})
 
             _authorized_key_directory = u.get("authorized_key_directory", None)
 
@@ -1036,132 +1062,6 @@ class Users():
             msg = "development .."
         )
 
-    def _create_directory(self, path, owner = None, group = None, mode="0750"):
-        """
-        """
-        self.module.log(msg=f"create directory {path}")
-
-        # if os.path.isdir(path):
-        #    return
-
-        try:
-            os.makedirs(path, exist_ok=True)
-        except FileExistsError:
-            pass
-
-        if mode is not None:
-            os.chmod(path, int(mode, base=8))
-
-        if owner is not None:
-            try:
-                owner = pwd.getpwnam(owner).pw_uid
-            except KeyError:
-                owner = int(owner)
-                pass
-        else:
-            owner = 0
-
-        if group is not None:
-            try:
-                group = grp.getgrnam(group).gr_gid
-            except KeyError:
-                group = int(group)
-                pass
-        else:
-            group = 0
-
-        os.chown(path, int(owner), int(group))
-
-        return
-
-    def _remove_directory(self, path):
-        """
-        """
-        self.module.log(msg=f"remove directory {path}")
-
-        for root, dirs, files in os.walk(path, topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
-            for name in dirs:
-                os.rmdir(os.path.join(root, name))
-
-    def _verify_authorized_keys(self, file_name, keys):
-        """
-        """
-        _old_sorted_keys = []
-        _old_checksum = ""
-
-        # file_name = os.path.join(path, "authorized_keys")
-
-        _new_sorted_keys = sorted(keys)
-
-        _new_checksum = self.__checksum("|".join(_new_sorted_keys))
-
-        # self.module.log(msg=f"  _checksum: {_new_checksum}")
-
-        """
-          read file to generte checksum
-        """
-        if os.path.isfile(file_name):
-            with open(file_name, 'r') as fp:
-                lines = [line.rstrip() for line in fp]
-                _old_sorted_keys = sorted(lines)
-
-            # self.module.log(msg=f"  lines: {_old_sorted_keys}")
-
-            _old_checksum = self.__checksum("|".join(_old_sorted_keys))
-
-            # self.module.log(msg=f"  _checksum: {_old_checksum}")
-
-        result = (_new_checksum == _old_checksum)
-
-        # self.module.log(msg=f"result: {result}")
-
-        return result
-
-    def _save_authorized_keys(self, file_name, keys, owner = None, group = None, mode="0750"):
-        """
-        """
-        # file_name = os.path.join(path, "authorized_keys")
-
-        # open file in write mode
-        with open(file_name, 'w') as fp:
-            fp.write("\n".join(str(item) for item in keys))
-
-        if mode is not None:
-            os.chmod(file_name, int(mode, base=8))
-
-        if owner is not None:
-            try:
-                owner = pwd.getpwnam(owner).pw_uid
-            except KeyError:
-                owner = int(owner)
-                pass
-        else:
-            owner = 0
-
-        if group is not None:
-            try:
-                group = grp.getgrnam(group).gr_gid
-            except KeyError:
-                group = int(group)
-                pass
-        else:
-            group = 0
-
-        os.chown(file_name, int(owner), int(group))
-
-    def __checksum(self, plaintext):
-        """
-        """
-        if isinstance(plaintext, dict):
-            password_bytes = json.dumps(plaintext, sort_keys=True).encode('utf-8')
-        else:
-            password_bytes = plaintext.encode('utf-8')
-
-        password_hash = hashlib.sha256(password_bytes)
-        return password_hash.hexdigest()
-
 
 # ---------------------------------------------------------------------------------------
 # Module execution.
@@ -1175,61 +1075,6 @@ def main():
                 required = True,
                 type = "list"
             )
-
-            # state = dict(
-            #     required=True,
-            #     choices= ["absent", "present"],
-            #     default = "present",
-            # ),
-            # username = dict(
-            #     required=False,
-            #     type='str'
-            # ),
-            # password = dict(
-            #     required=False,
-            #     no_log=True,
-            #     type='str'
-            # ),
-            # home = dict(
-            #     required=False,
-            #     type='str'
-            # ),
-            # create_home = dict(
-            #     required=False,
-            #     type='bool'
-            # ),
-            # comment = dict(
-            #     required=False,
-            #     type='str'
-            # ),
-            # groups = dict(
-            #     required=False,
-            #     type='list'
-            # ),
-            # update_password = dict(
-            #     required=False,
-            #     type='bool'
-            # ),
-            # uid = dict(
-            #     required=False,
-            #     type='str'
-            # ),
-            # shell = dict(
-            #     required=False,
-            #     type='str'
-            # ),
-            # ssh_keys = dict(
-            #     required=False,
-            #     type='list'
-            # ),
-            # ssh_keys_directory = dict(
-            #     required=False,
-            #     type='path'
-            # ),
-            # ssh_private_key = dict(
-            #     required=False,
-            #     type='str'
-            # ),
         ),
         supports_check_mode=False,
     )

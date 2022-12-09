@@ -41,6 +41,69 @@ users:
     user_state: present
     # remove home directory too
     remove: true
+
+  - username: user_01
+    user_state: present
+
+  - username: user_02
+    user_state: present
+
+  - username: user_03
+    user_state: present
+
+  - username: user_04
+    user_state: present
+
+  - username: user_05
+    user_state: present
+
+  - username: user_06
+    user_state: present
+
+  - username: user_07
+    user_state: present
+
+  - username: user_08
+    user_state: present
+
+  - username: user_09
+    user_state: present
+
+  - username: user_10
+    user_state: present
+
+  - username: user_11
+    user_state: present
+
+  - username: user_12
+    user_state: present
+
+  - username: user_13
+    user_state: present
+
+  - username: user_14
+    user_state: present
+
+  - username: user_15
+    user_state: present
+
+  - username: user_16
+    user_state: present
+
+  - username: user_17
+    user_state: present
+
+  - username: user_18
+    user_state: present
+
+  - username: user_19
+    user_state: present
+
+  - username: user_20
+    user_state: present
+
+
+
   #
 #   - username: dread_zandra
 #     comment: Dread Pirate Zandra

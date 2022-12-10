@@ -233,6 +233,7 @@ class SingleUser():
             command_name = 'luseradd'
             lgroupmod_cmd = self.module.get_bin_path('lgroupmod', True)
             lchage_cmd = self.module.get_bin_path('lchage', True)
+
         else:
             command_name = 'useradd'
 
@@ -672,6 +673,8 @@ class UsersHelper():
         """
         self.module = module
 
+        self.changed = False
+
     def user_info(self):
         """
         """
@@ -854,6 +857,12 @@ class AuthorizedKeys(UsersHelper):
                 # changed keys
                 self.save_file(file_name=_authorized_key_file, data=self.authorized_keys, mode="0600")
 
+                self.changed = True
+
+        return dict(
+          changed=self.changed
+        )
+
     def remove(self, path = None):
         """
         """
@@ -906,9 +915,15 @@ class SshKeys(UsersHelper):
 
                 if not self.verify_files(ssh_key_file, ssh_key_value):
                     self.save_file(ssh_key_file, ssh_key_value)
+
+                    self.change = True
         else:
             self.module.log(msg=f"wrong ssh_keys format for user {self.user_name}")
 
+
+        return dict(
+          changed=self.changed
+        )
 
 class Users():
     """
@@ -927,16 +942,16 @@ class Users():
     def run(self):
         """
         """
-        res = {}
+        result = {}
 
         auth_keys = AuthorizedKeys(self.module)
         ssh_keys = SshKeys(self.module)
 
         for u in self.users:
             self.module.log(msg="-----------------------------------------------------------")
-            self.module.log(msg=f"  - {u}")
+            # self.module.log(msg=f"  - {u}")
 
-            result = {}
+            res = {}
 
             _username = u.get("username")
             _state = u.get("user_state")
@@ -948,20 +963,27 @@ class Users():
             _authorized_key_directory = u.get("authorized_key_directory", None)
 
             m = dict(
-                state = _state,
-                username = _username,
-                password = u.get("password"),
-                home = _home,
-                create_home = u.get("create_home", True),
-                comment = u.get("comment"),
-                uid = u.get("uid", None),
-                group = u.get("group", None),
-                update_password = u.get("update_password", 'always'),
-                shell = u.get("shell", None),
                 authorized_keys = _authorized_keys,
-                ssh_keys = _ssh_keys,
+                comment = u.get("comment"),
+                create_home = u.get("create_home", True),
+                expires = u.get("expires"),
                 force = u.get('force', False),
+                group = u.get("group", None),
+                groups = u.get("groups", []),
+                home = _home,
+                local = u.get('local', False),
+                password = u.get("password"),
+                password_expire_max = u.get("password_expire_max"),
+                password_expire_min = u.get("password_expire_min"),
+                password_lock = u.get("password_lock"),
                 remove = u.get('remove', False),
+                shell = u.get("shell", "/bin/bash"),
+                ssh_keys = _ssh_keys,
+                state = _state,
+                uid = u.get("uid", None),
+                umask = u.get("umask"),
+                update_password = u.get("update_password", 'always'),
+                username = _username,
             )
 
             user = SingleUser(m, self.module)
@@ -975,20 +997,49 @@ class Users():
                 """
                 """
                 if user_exists:
-
+                    """
+                    """
                     if self.module.check_mode:
-                        self.module.exit_json(changed=True)
+                        res.update({
+                          "check_mode": True,
+                          "msg": "check mode"
+                        })
 
-                    auth_keys.user(user, _authorized_keys)
-                    authorized_keys_state = auth_keys.remove(_authorized_key_directory)
+                    if _authorized_keys:
+                        auth_keys.user(user, _authorized_keys)
+                        authorized_keys_state = auth_keys.remove(_authorized_key_directory)
 
+                        res.update({
+                          "authorized_key": authorized_keys_state
+                        })
+
+                    self.module.log(msg="    - remove user")
                     (rc, out, err) = user.remove_user()
 
-                    if rc != 0:
-                        self.module.fail_json(name=user.username, msg=err, rc=rc)
+                    self.module.log(msg=f"    - rc : {rc}")
+                    self.module.log(msg=f"    - out: {out}")
+                    self.module.log(msg=f"    - err: {err}")
 
-                    result['force'] = user.force
-                    result['remove'] = user.remove
+                    if rc != 0:
+                        res.update({
+                          "failed": True,
+                          "msg": err,
+                          "rc": rc
+                        })
+                        # self.module.fail_json(name=user.username, msg=err, rc=rc)
+                    else:
+                      res.update({
+                        "force": user.force,
+                        "remove": user.remove,
+                        "msg": "user removed",
+                      })
+                    #res['force'] = user.force
+                    #res['remove'] = user.remove
+                else:
+                    res.update({
+                        "changed": False
+                    })
+
 
             elif _state == 'present':
                 """
@@ -997,7 +1048,11 @@ class Users():
                     """
                     """
                     if self.module.check_mode:
-                        self.module.exit_json(changed=True)
+                        res.update({
+                          "check_mode": True,
+                          "msg": "check mode"
+                        })
+                        # self.module.exit_json(changed=True)
 
                     # Check to see if the provided home path contains parent directories
                     # that do not exist.
@@ -1007,7 +1062,18 @@ class Users():
                         if not os.path.isdir(parent):
                             path_needs_parents = True
 
+                    self.module.log(msg="    - create user")
                     (rc, out, err) = user.create_user()
+
+                    self.module.log(msg=f"    - rc : {rc}")
+                    self.module.log(msg=f"    - out: {out}")
+                    self.module.log(msg=f"    - err: {err}")
+
+                    if rc == 0:
+                        res.update({
+                            "changed": True,
+                            "msg": "User successful created",
+                        })
 
                     # If the home path had parent directories that needed to be created,
                     # make sure file permissions are correct in the created home directory.
@@ -1020,46 +1086,81 @@ class Users():
                             user.chown_homedir(info[2], info[3], user.home)
 
                     if self.module.check_mode:
-                        result['system'] = user.name
+                        res.update({
+                            "system": user.name
+                        })
                     else:
-                        result['system'] = user.system
-                        result['create_home'] = user.create_home
+                        res.update({
+                          "system": user.system,
+                          "create_home": user.create_home
+                        })
+                        # res['system'] = user.system
+                        # res['create_home'] = user.create_home
                 else:
                     # modify user (note: this function is check mode aware)
+                    self.module.log(msg="    - modify user")
                     (rc, out, err) = user.modify_user()
-                    result['append'] = user.append
-                    result['move_home'] = user.move_home
+
+                    self.module.log(msg=f"    - rc : {rc}")
+                    self.module.log(msg=f"    - out: {out}")
+                    self.module.log(msg=f"    - err: {err}")
+
+                    if rc is None:
+                        res.update({
+                          "changed": False
+                        })
+
+                    # res.update({
+                    #   "append": user.append,
+                    #   "move_home": user.move_home,
+                    #   "msg": err,
+                    #   "rc": rc,
+                    # })
 
                 if rc is not None and rc != 0:
-                    self.module.fail_json(name=user.username, msg=err, rc=rc)
+                    res.update({
+                      "failed": True,
+                      "msg": err,
+                      "rc": rc,
+                    })
+                    # self.module.fail_json(name=user.username, msg=err, rc=rc)
 
                 if user.password is not None:
-                    result['password'] = 'NOT_LOGGING_PASSWORD'
+                    res['password'] = 'NOT_LOGGING_PASSWORD'
 
-                auth_keys.user(user, _authorized_keys)
-                authorized_keys_state = auth_keys.save(_authorized_key_directory)
+                if _authorized_keys:
+                    auth_keys.user(user, _authorized_keys)
+                    authorized_keys_state = auth_keys.save(_authorized_key_directory)
 
-                ssh_keys.user(user, _ssh_keys)
-                ssh_keys_state = ssh_keys.save()
+                    res.update({
+                      "authorized_key": authorized_keys_state
+                    })
 
-                self.module.log(msg=f"    - authorized_keys_state : {authorized_keys_state}")
-                self.module.log(msg=f"    - ssh_keys_state        : {ssh_keys_state}")
+                if _ssh_keys:
+                    ssh_keys.user(user, _ssh_keys)
+                    ssh_keys_state = ssh_keys.save()
 
-            res[_username] = result
+                    res.update({
+                      "ssh_keys": ssh_keys_state
+                    })
+
+
+            result[_username] = res
 
         self.module.log(msg="-----------------------------------------------------------")
 
-        self.module.log(msg=f"  = {res}")
+        self.module.log(msg=f"  = {result}")
 
         self.module.log(msg="-----------------------------------------------------------")
 
-        result.update({"failed": False})
+        # result.update({"failed": False})
 
         # return result
 
         return dict(
-            failed = True,
-            msg = "development .."
+            failed = False,
+            changed = False,
+            result = result,
         )
 
 

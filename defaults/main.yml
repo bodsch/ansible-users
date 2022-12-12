@@ -1,19 +1,23 @@
 ---
 
-users_default_update_password: on_create
-users_default_shell: /bin/bash
+users_output: "compact"  # or: 'full' for more output
 
 users: []
 #   - username: bodsch
+#     state:
+#     remove: true
 #     password: ..
 #     update_password: always
 #     comment: Foo Bar
 #     shell: /bin/bash
-#     ssh_key: |
-#       ssh-rsa ...
-#       ssh-rsa ...
-#     exclusive_ssh_key: true
-#     use_sudo: true
-#     use_sudo_nopass: true
-#     user_state: present
-#     ssh_private_key: []
+#     ssh_keys: |
+#       id_ed25519: <string>
+#       ssh-rsa: <string>
+#       id_ed25519.pub: <string>
+#     authorized_keys: []
+#     authorized_key_directory: <directory>
+#     sudo:
+#       nopassword: true
+#       runas: "ALL"
+#       commands:
+#         - ALL

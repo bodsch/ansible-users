@@ -26,7 +26,7 @@ class FilterModule(object):
 
         for u in users:
             username = u.get('username')
-            user_state = u.get('user_state')
+            user_state = u.get('state')
             display.v(f"  - user : {username} / {user_state}")
 
             if user_state == 'absent':
@@ -51,7 +51,7 @@ class FilterModule(object):
         result = []
 
         for u in users:
-            if u.get('user_state', "absent") == 'absent':
+            if u.get('state', "absent") == 'absent':
                 result.append(u)
 
         return result
@@ -63,7 +63,7 @@ class FilterModule(object):
 
         for u in data:
             username = u.get("username", None)
-            user_state = u.get("user_state", None)
+            user_state = u.get("state", None)
 
             display.v(f"  - user : {username} / {user_state}")
 

@@ -1,6 +1,6 @@
 ---
 
-- name: check if user_state are defined and valid
+- name: check if state are defined and valid
   ansible.builtin.set_fact:
     non_valid_users: "{{ users | validate_state }}"
 

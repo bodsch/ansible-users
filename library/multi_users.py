@@ -2,27 +2,24 @@
 
 # -*- coding: utf-8 -*-
 
-# (c) 2020, Bodo Schulz <bodo@boone-schulz.de>
+# (c) 2022, Bodo Schulz <bodo@boone-schulz.de>
 # BSD 2-clause (see LICENSE or https://opensource.org/licenses/BSD-2-Clause)
 
 from __future__ import absolute_import, division, print_function
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils._text import to_native
+from ansible.module_utils._text import to_bytes, to_native
+from ansible.module_utils import distro
+
+import json
 import hashlib
-import warnings
 import time
-import subprocess
-import socket
 import shutil
-import select
 import re
 import pwd
-import pty
 import os
 import math
 import grp
 import errno
-import calendar
 import base64
 import binascii
 
@@ -48,9 +45,9 @@ _HASH_RE = re.compile(r'[^a-zA-Z0-9./=]')
 class SingleUser():
     """
     """
-    platform = 'Generic'
-    distribution = None  # type: str | None
-    PASSWORDFILE = '/etc/passwd'
+    # platform = 'Generic'
+    # distribution = None  # type: str | None
+    # PASSWORDFILE = '/etc/passwd'
     SHADOWFILE = '/etc/shadow'  # type: str | None
     SHADOWFILE_EXPIRE_INDEX = 7
     LOGIN_DEFS = '/etc/login.defs'
@@ -61,36 +58,40 @@ class SingleUser():
         """
         self.module = module
 
-        self.module.log(msg=f"  user: '{user}'")
+        # self.module.log(msg=f"  user: '{user}'")
 
-        self.state = user.get("state")
-        self.username = user.get("username")
-        self.password = user.get("password")
-        self.home = user.get("home")
-        self.create_home = user.get("create_home", True)
+        self.append = user.get("append", False)
         self.comment = user.get("comment")
-        self.local   = user.get("local", False)
-        self.uid = user.get("uid", None)
+        self.create_home = user.get("create_home", True)
+        self.expires = user.get("expires", None)
+        self.force = user.get("force", False)
         self.group = user.get("group", None)
         self.groups = ",".join(user.get("groups", []))
-        self.shell = user.get("shell", None)
-        self.system = user.get("system", False)
-        self.append = user.get("append", False)
+        self.home = user.get("home")
         self.move_home = user.get("move_home", False)
-
-        self.expires = None
-        self.skeleton = None
-        self.umask = None
+        self.password = user.get("password", None)
         self.password_lock = user.get("password_lock", False)
-        self.update_password = user.get("update_password", 'always')
-        self.force = user.get("force", False)
         self.remove = user.get("remove", False)
-        self.seuser = None
+        self.seuser = user.get("seuser", None)
+        self.shell = user.get("shell", None)
+        self.skeleton = user.get("skeleton", None)
+        self.state = user.get("state")
+        self.system = user.get("system", False)
+        self.uid = user.get("uid", None)
+        self.umask = user.get("umask", None)
+        self.update_password = user.get("update_password", 'always')
+        self.username = user.get("username")
 
     def check_password_encrypted(self):
         """
         """
-        if self.password:
+        msg = None
+        maybe_invalid = True
+
+        if not self.password:
+            return (False, "no password given.")
+
+        else:
             maybe_invalid = False
 
             # Allow setting certain passwords in order to disable the account
@@ -122,11 +123,17 @@ class SingleUser():
                         maybe_invalid = True
 
             if maybe_invalid:
-                return "The input password appears not to have been hashed.\nThe 'password' argument must be encrypted for this module to work properly."
+                msg = "The input password appears not to have been hashed.\nThe 'password' argument must be encrypted for this module to work properly."
+
+        return (maybe_invalid, msg)
 
     def execute_command(self, cmd, use_unsafe_shell=False, data=None, obey_checkmode=True):
+        """
+        """
+        # self.module.log(f"execute_command({cmd}, {use_unsafe_shell}, {data}, {obey_checkmode}")
+
         if self.module.check_mode and obey_checkmode:
-            self.module.debug('In check mode, would have run: "%s"' % cmd)
+            self.module.debug(f"In check mode, would have run: '{cmd}'")
             return (0, '', '')
         else:
             # cast all args to strings ansible-modules-core/issues/4397
@@ -134,46 +141,20 @@ class SingleUser():
             return self.module.run_command(cmd, use_unsafe_shell=use_unsafe_shell, data=data)
 
     def user_exists(self):
-        # The pwd module does not distinguish between local and directory accounts.
-        # It's output cannot be used to determine whether or not an account exists locally.
-        # It returns True if the account exists locally or in the directory, so instead
-        # look in the local PASSWORD file for an existing account.
-        if self.local:
-            if not os.path.exists(self.PASSWORDFILE):
-                return dict(
-                    failed = True,
-                    msg = f"'local: true' specified but unable to find local account file {self.PASSWORDFILE} to parse."
-                )
-
-            exists = False
-            name_test = f'{self.username}:'
-
-            with open(self.PASSWORDFILE, 'rb') as f:
-                reversed_lines = f.readlines()[::-1]
-                for line in reversed_lines:
-                    if line.startswith(to_bytes(name_test)):
-                        exists = True
-                        break
-
-            if not exists:
-                msg = "'local: true' specified and user '{name}' was not found in {file}. \
-                       The local user account may already exist if the local account database exists \
-                       somewhere other than {file}.".format(file=self.PASSWORDFILE, name=self.username)
-
-            return exists
-
-        else:
-            try:
-                if pwd.getpwnam(self.username):
-                    return True
-            except KeyError:
-                return False
+        """
+        """
+        try:
+            if pwd.getpwnam(self.username):
+                return True
+        except KeyError:
+            return False
 
     def get_pwd_info(self):
         """
         """
         if not self.user_exists():
             return False
+
         return list(pwd.getpwnam(self.username))
 
     def user_info(self):
@@ -181,9 +162,11 @@ class SingleUser():
         """
         if not self.user_exists():
             return False
+
         info = self.get_pwd_info()
         if len(info[1]) == 1 or len(info[1]) == 0:
             info[1] = self.user_password()[0]
+
         return info
 
     def user_password(self):
@@ -208,6 +191,7 @@ class SingleUser():
 
         if not self.user_exists():
             return passwd, expires
+
         elif self.SHADOWFILE:
             passwd, expires = self.parse_shadow_file()
 
@@ -221,21 +205,16 @@ class SingleUser():
         if os.path.exists(self.SHADOWFILE) and os.access(self.SHADOWFILE, os.R_OK):
             with open(self.SHADOWFILE, 'r') as f:
                 for line in f:
-                    if line.startswith('%s:' % self.username):
+                    if line.startswith(f"{self.username}:"):
                         passwd = line.split(':')[1]
                         expires = line.split(':')[self.SHADOWFILE_EXPIRE_INDEX] or -1
+
         return passwd, expires
 
     def create_user(self):
         """
         """
-        if self.local:
-            command_name = 'luseradd'
-            lgroupmod_cmd = self.module.get_bin_path('lgroupmod', True)
-            lchage_cmd = self.module.get_bin_path('lchage', True)
-
-        else:
-            command_name = 'useradd'
+        command_name = 'useradd'
 
         cmd = [self.module.get_bin_path(command_name, True)]
 
@@ -252,7 +231,8 @@ class SingleUser():
 
         if self.group is not None:
             if not self.group_exists(self.group):
-                self.module.fail_json(msg="Group %s does not exist" % self.group)
+                msg = f"Group {self.group} does not exist"
+                return (1, "", msg)
 
             cmd.append('-g')
             cmd.append(self.group)
@@ -265,10 +245,11 @@ class SingleUser():
             if os.path.exists('/etc/redhat-release'):
                 dist = distro.version()
                 major_release = int(dist.split('.')[0])
-                if major_release <= 5 or self.local:
+                if major_release <= 5:
                     cmd.append('-n')
                 else:
                     cmd.append('-N')
+
             elif os.path.exists('/etc/SuSE-release'):
                 # -N did not exist in useradd before SLE 11 and did not
                 # automatically create a group
@@ -281,9 +262,9 @@ class SingleUser():
 
         if self.groups is not None and len(self.groups):
             groups = self.get_groups_set()
-            if not self.local:
-                cmd.append('-G')
-                cmd.append(','.join(groups))
+
+            cmd.append('-G')
+            cmd.append(','.join(groups))
 
         if self.comment is not None:
             cmd.append('-c')
@@ -297,6 +278,7 @@ class SingleUser():
                 parent = os.path.dirname(self.home)
                 if not os.path.isdir(parent):
                     self.create_homedir(self.home)
+
             cmd.append('-d')
             cmd.append(self.home)
 
@@ -304,7 +286,7 @@ class SingleUser():
             cmd.append('-s')
             cmd.append(self.shell)
 
-        if self.expires is not None and not self.local:
+        if self.expires is not None:
             cmd.append('-e')
             if self.expires < time.gmtime(0):
                 cmd.append('')
@@ -314,13 +296,12 @@ class SingleUser():
         if self.password is not None:
             cmd.append('-p')
             if self.password_lock:
-                cmd.append('!%s' % self.password)
+                cmd.append(f"!{self.password}")
             else:
                 cmd.append(self.password)
 
         if self.create_home:
-            if not self.local:
-                cmd.append('-m')
+            cmd.append('-m')
 
             if self.skeleton is not None:
                 cmd.append('-k')
@@ -337,40 +318,20 @@ class SingleUser():
 
         cmd.append(self.username)
         (rc, out, err) = self.execute_command(cmd)
-        if not self.local or rc != 0:
-            return (rc, out, err)
 
-        if self.expires is not None:
-            if self.expires < time.gmtime(0):
-                lexpires = -1
-            else:
-                # Convert seconds since Epoch to days since Epoch
-                lexpires = int(math.floor(self.module.params['expires'])) // 86400
-            (rc, _out, _err) = self.execute_command([lchage_cmd, '-E', to_native(lexpires), self.username])
-            out += _out
-            err += _err
-            if rc != 0:
-                return (rc, out, err)
+        if rc != 0:
+            return (rc, out, err)
 
         if self.groups is None or len(self.groups) == 0:
             return (rc, out, err)
 
-        for add_group in groups:
-            (rc, _out, _err) = self.execute_command([lgroupmod_cmd, '-M', self.username, add_group])
-            out += _out
-            err += _err
-            if rc != 0:
-                return (rc, out, err)
         return (rc, out, err)
 
     def remove_user(self):
-        if self.local:
-            command_name = 'luserdel'
-        else:
-            command_name = 'userdel'
+        command_name = 'userdel'
 
         cmd = [self.module.get_bin_path(command_name, True)]
-        if self.force and not self.local:
+        if self.force:
             cmd.append('-f')
         if self.remove:
             cmd.append('-r')
@@ -381,15 +342,7 @@ class SingleUser():
     def modify_user(self):
         """
         """
-        if self.local:
-            command_name = 'lusermod'
-            lgroupmod_cmd = self.module.get_bin_path('lgroupmod', True)
-            lgroupmod_add = set()
-            lgroupmod_del = set()
-            lchage_cmd = self.module.get_bin_path('lchage', True)
-            lexpires = None
-        else:
-            command_name = 'usermod'
+        command_name = 'usermod'
 
         cmd = [self.module.get_bin_path(command_name, True)]
         info = self.user_info()
@@ -404,7 +357,9 @@ class SingleUser():
 
         if self.group is not None:
             if not self.group_exists(self.group):
-                self.module.fail_json(msg="Group %s does not exist" % self.group)
+                msg = f"Group {self.group} does not exist"
+                return (1, "", msg)
+
             ginfo = self.group_info(self.group)
             if info[3] != ginfo[2]:
                 cmd.append('-g')
@@ -435,20 +390,13 @@ class SingleUser():
                         groups_need_mod = True
 
             if groups_need_mod:
-                if self.local:
-                    if self.append:
-                        lgroupmod_add = set(groups).difference(current_groups)
-                        lgroupmod_del = set()
-                    else:
-                        lgroupmod_add = set(groups).difference(current_groups)
-                        lgroupmod_del = set(current_groups).difference(groups)
+
+                if self.append and not has_append:
+                    cmd.append('-A')
+                    cmd.append(','.join(group_diff))
                 else:
-                    if self.append and not has_append:
-                        cmd.append('-A')
-                        cmd.append(','.join(group_diff))
-                    else:
-                        cmd.append('-G')
-                        cmd.append(','.join(groups))
+                    cmd.append('-G')
+                    cmd.append(','.join(groups))
 
         if self.comment is not None and info[4] != self.comment:
             cmd.append('-c')
@@ -470,23 +418,16 @@ class SingleUser():
 
             if self.expires < time.gmtime(0):
                 if current_expires >= 0:
-                    if self.local:
-                        lexpires = -1
-                    else:
-                        cmd.append('-e')
-                        cmd.append('')
+                    cmd.append('-e')
+                    cmd.append('')
             else:
                 # Convert days since Epoch to seconds since Epoch as struct_time
                 current_expire_date = time.gmtime(current_expires * 86400)
 
                 # Current expires is negative or we compare year, month, and day only
                 if current_expires < 0 or current_expire_date[:3] != self.expires[:3]:
-                    if self.local:
-                        # Convert seconds since Epoch to days since Epoch
-                        lexpires = int(math.floor(self.module.params['expires'])) // 86400
-                    else:
-                        cmd.append('-e')
-                        cmd.append(time.strftime(self.DATE_FORMAT, self.expires))
+                    cmd.append('-e')
+                    cmd.append(time.strftime(self.DATE_FORMAT, self.expires))
 
         # Lock if no password or unlocked, unlock only if locked
         if self.password_lock and not info[1].startswith('!'):
@@ -502,7 +443,7 @@ class SingleUser():
             cmd.append('-p')
             if self.password_lock:
                 # Lock the account and set the hash in a single command
-                cmd.append('!%s' % self.password)
+                cmd.append(f"!{self.password}")
             else:
                 cmd.append(self.password)
 
@@ -513,32 +454,9 @@ class SingleUser():
             cmd.append(self.username)
             (rc, out, err) = self.execute_command(cmd)
 
-        if not self.local or not (rc is None or rc == 0):
+        if not (rc is None or rc == 0):
             return (rc, out, err)
 
-        if lexpires is not None:
-            (rc, _out, _err) = self.execute_command([lchage_cmd, '-E', to_native(lexpires), self.username])
-            out += _out
-            err += _err
-            if rc != 0:
-                return (rc, out, err)
-
-        if len(lgroupmod_add) == 0 and len(lgroupmod_del) == 0:
-            return (rc, out, err)
-
-        for add_group in lgroupmod_add:
-            (rc, _out, _err) = self.execute_command([lgroupmod_cmd, '-M', self.username, add_group])
-            out += _out
-            err += _err
-            if rc != 0:
-                return (rc, out, err)
-
-        for del_group in lgroupmod_del:
-            (rc, _out, _err) = self.execute_command([lgroupmod_cmd, '-m', self.username, del_group])
-            out += _out
-            err += _err
-            if rc != 0:
-                return (rc, out, err)
         return (rc, out, err)
 
     def group_exists(self, group):
@@ -557,11 +475,7 @@ class SingleUser():
         """
         """
         # check if this version of usermod can append groups
-
-        if self.local:
-            command_name = 'lusermod'
-        else:
-            command_name = 'usermod'
+        command_name = 'usermod'
 
         usermod_path = self.module.get_bin_path(command_name, True)
 
@@ -583,8 +497,11 @@ class SingleUser():
         return False
 
     def group_info(self, group):
+        """
+        """
         if not self.group_exists(group):
             return False
+
         try:
             # Try group as a gid first
             return list(grp.getgrgid(int(group)))
@@ -592,6 +509,8 @@ class SingleUser():
             return list(grp.getgrnam(group))
 
     def get_groups_set(self, remove_existing=True):
+        """
+        """
         if self.groups is None:
             return None
         info = self.user_info()
@@ -600,16 +519,24 @@ class SingleUser():
 
         for g in groups.copy():
             if not self.group_exists(g):
-                self.module.fail_json(msg="Group %s does not exist" % (g))
+                msg = f"Group {self.group} does not exist"
+                return (1, "", msg)
+
             if info and remove_existing and self.group_info(g)[2] == info[3]:
                 groups.remove(g)
+
         return groups
 
     def user_group_membership(self, exclude_primary=True):
-        ''' Return a list of groups the user belongs to '''
+        '''
+            Return a list of groups the user belongs to
+        '''
         groups = []
         info = self.get_pwd_info()
+
         for group in grp.getgrall():
+            """
+            """
             if self.username in group.gr_mem:
                 # Exclude the user's primary group by default
                 if not exclude_primary:
@@ -633,12 +560,13 @@ class SingleUser():
                 try:
                     shutil.copytree(skeleton, path, symlinks=True)
                 except OSError as e:
-                    self.module.exit_json(failed=True, msg="%s" % to_native(e))
+                    self.module.exit_json(failed=True, msg=f"{to_native(e)}")
             else:
                 try:
                     os.makedirs(path)
                 except OSError as e:
-                    self.module.exit_json(failed=True, msg="%s" % to_native(e))
+                    self.module.exit_json(failed=True, msg=f"{to_native(e)}")
+
             # get umask from /etc/login.defs and set correct home mode
             if os.path.exists(self.LOGIN_DEFS):
                 with open(self.LOGIN_DEFS, 'r') as f:
@@ -650,7 +578,7 @@ class SingleUser():
                             try:
                                 os.chmod(path, mode)
                             except OSError as e:
-                                self.module.exit_json(failed=True, msg="%s" % to_native(e))
+                                self.module.exit_json(failed=True, msg=f"{to_native(e)}")
 
     def chown_homedir(self, uid, gid, path):
         try:
@@ -661,7 +589,7 @@ class SingleUser():
                 for f in files:
                     os.chown(os.path.join(root, f), uid, gid)
         except OSError as e:
-            self.module.exit_json(failed=True, msg="%s" % to_native(e))
+            self.module.exit_json(failed=True, msg=f"{to_native(e)}")
 
 
 class UsersHelper():
@@ -687,7 +615,7 @@ class UsersHelper():
         self.uid = str(uid)
         self.gid = str(gid)
 
-        self.module.log(msg=f"    - user_name: {self.user_name}, uid: {self.uid}, gid: {self.gid}, home: {self.user_home}")
+        # self.module.log(msg=f"    - user_name: {self.user_name}, uid: {self.uid}, gid: {self.gid}, home: {self.user_home}")
 
     def create_directory(self, path, mode="0700"):
         """
@@ -806,7 +734,7 @@ class UsersHelper():
         """
         try:
             data = base64.b64decode(sb, validate=True).decode('utf-8')
-        except binascii.Error as e:
+        except binascii.Error:
             # self.module.log(msg=f"ERROR  {e}")
             data = sb
 
@@ -849,7 +777,7 @@ class AuthorizedKeys(UsersHelper):
                 _authorized_key_directory_mode = "0750"
                 _authorized_key_file = os.path.join(path, self.user_name)
 
-            self.module.log(msg=f"    - key file: {_authorized_key_file}")
+            # self.module.log(msg=f"    - key file: {_authorized_key_file}")
 
             self.create_directory(path, _authorized_key_directory_mode)
 
@@ -860,7 +788,7 @@ class AuthorizedKeys(UsersHelper):
                 self.changed = True
 
         return dict(
-          changed=self.changed
+            changed=self.changed
         )
 
     def remove(self, path = None):
@@ -920,12 +848,158 @@ class SshKeys(UsersHelper):
         else:
             self.module.log(msg=f"wrong ssh_keys format for user {self.user_name}")
 
-
         return dict(
-          changed=self.changed
+            changed=self.changed
         )
 
-class Users():
+
+class Sudoers(UsersHelper):
+    """
+    """
+    module = None
+
+    def __init__(self, module):
+        """
+          Initialize Variables
+        """
+        UsersHelper.__init__(self, module)
+
+        self.user_data = None
+        self.nopassword = False
+        self.runas = None
+        self.sudoers_path = '/etc/sudoers.d'
+        self.file_name = None
+        self.commands = []
+
+
+    def user(self, user, sudo_data):
+        """
+        """
+        self.user_data = user
+
+        #self.user_info()
+
+        #self.user = self.user_name
+        self.nopassword = sudo_data.get('nopassword', False)
+        self.runas = sudo_data.get('runas', None)
+        self.group = sudo_data.get('group', None)
+        self.sudoers_path = sudo_data.get('sudoers_path', '/etc/sudoers.d')
+        # self.file_name = os.path.join(self.sudoers_path, self.user_name)
+        self.commands = sudo_data.get('commands')
+
+        self.sudo_data = sudo_data
+
+    def create_sudoers(self):
+        """
+        """
+        if not os.path.isdir(self.sudoers_path):
+            return dict(
+                failed = True,
+                msg = f"directory {self.sudoers_path} not exists.",
+            )
+
+        self.user_info()
+        self.file_name = os.path.join(self.sudoers_path, self.user_name)
+
+        if isinstance(self.commands, str):
+            commands = [self.commands]
+        else:
+            commands = self.commands
+
+        self.commands = commands
+
+        self.module.log(msg=f"  sudoers file {self.file_name}")
+        self.module.log(msg=f"  sudoers data {self.sudo_data} {len(self.sudo_data)}")
+
+        if len(self.sudo_data) == 0:
+            return dict(
+                changed = False,
+                failed = False
+            )
+
+        content = self.content()
+
+        self.module.log(msg=f"  content {content}")
+
+        if not self.verify_files(self.file_name, content):
+            # changed keys
+            self.save_file(file_name=self.file_name, data=content, mode="0755")
+
+            # validate created sudoers rule
+            valid, msg = self.validate(self.file_name)
+            # self.module.log(msg=f"  valid {valid}")
+
+            if not valid:
+                self.module.log(msg=f"  ERROR {msg}")
+                self.delete_sudoers()
+
+                return dict(
+                    failed = True,
+                    msg = msg
+                )
+
+            self.changed = True
+
+        return dict(
+            changed=self.changed
+        )
+
+    def delete_sudoers(self):
+        """
+        """
+        self.user_info()
+        self.file_name = os.path.join(self.sudoers_path, self.user_name)
+
+        if os.path.isdir(self.sudoers_path) and os.path.isfile(self.file_name):
+            os.remove(self.file_name)
+
+            return dict(
+                changed = True,
+                failed = False
+            )
+
+
+    def content(self):
+        nopasswd_str = ""
+        runas_str = ""
+
+        if self.group:
+            owner = f"%{self.group}"
+        elif self.user_name:
+            owner = self.user_name
+
+        commands_str = ', '.join(self.commands)
+
+        if self.nopassword:
+            nopasswd_str = 'NOPASSWD:'
+
+        if self.runas:
+            runas_str = f"({self.runas})"
+
+        return f"{owner} ALL={runas_str}{nopasswd_str} {commands_str}\n"
+
+    def validate(self, file_name):
+        """
+        """
+        result = True
+        msg = "created sudoers rule are valid"
+
+        visudo_path = self.module.get_bin_path('visudo', required='required')
+
+        if visudo_path is None:
+            return
+
+        check_command = [visudo_path, '-c', '-f', file_name]
+        rc, stdout, stderr = self.module.run_command(check_command)
+
+        if rc != 0:
+            result = False
+            msg = f"Failed to validate sudoers rule:\n{stdout}\n{stderr}" # '.format(stdout=stdout))
+            # raise Exception('Failed to validate sudoers rule:\n{stdout}'.format(stdout=stdout))
+
+        return (result, msg)
+
+class MultiUsers():
     """
       Main Class to implement the Icinga2 API Client
     """
@@ -938,6 +1012,7 @@ class Users():
         self.module = module
 
         self.users = module.params.get("users")
+        self.output = module.params.get("output")
 
     def run(self):
         """
@@ -946,19 +1021,23 @@ class Users():
 
         auth_keys = AuthorizedKeys(self.module)
         ssh_keys = SshKeys(self.module)
+        sudoers = Sudoers(self.module)
 
         for u in self.users:
             self.module.log(msg="-----------------------------------------------------------")
-            # self.module.log(msg=f"  - {u}")
+            self.module.log(msg=f"  - {u}")
 
             res = {}
 
             _username = u.get("username")
-            _state = u.get("user_state")
+            _state = u.get("state")
             _home = u.get("home")
 
             _authorized_keys = u.get("authorized_keys", [])
             _ssh_keys = u.get("ssh_keys", {})
+            _sudo = u.get("sudo", {})
+
+            # self.module.log(msg=f"    sudo: {_sudo}")
 
             _authorized_key_directory = u.get("authorized_key_directory", None)
 
@@ -971,7 +1050,7 @@ class Users():
                 group = u.get("group", None),
                 groups = u.get("groups", []),
                 home = _home,
-                local = u.get('local', False),
+                # local = u.get('local', False),
                 password = u.get("password"),
                 password_expire_max = u.get("password_expire_max"),
                 password_expire_min = u.get("password_expire_min"),
@@ -987,181 +1066,220 @@ class Users():
             )
 
             user = SingleUser(m, self.module)
-            user.check_password_encrypted()
 
-            user_exists = user.user_exists()
+            (maybe_invalid, msg) = user.check_password_encrypted()
 
-            self.module.log(msg=f"    - user_exists: {user_exists}")
+            if maybe_invalid:
+                res.update({
+                    "failed": True,
+                    "msg": msg,
+                })
+            else:
+                user_exists = user.user_exists()
 
-            if _state == 'absent':
-                """
-                """
-                if user_exists:
+                if _state == 'absent':
                     """
                     """
-                    if self.module.check_mode:
+                    if user_exists:
+                        """
+                        """
+                        if self.module.check_mode:
+                            res.update({
+                                "check_mode": True,
+                                "msg": "check mode"
+                            })
+
+                        if _authorized_keys:
+                            auth_keys.user(user, _authorized_keys)
+                            authorized_keys_state = auth_keys.remove(_authorized_key_directory)
+
+                            res.update({
+                                "authorized_key": authorized_keys_state
+                            })
+
+                        if _sudo:
+                            sudoers.user(user, _sudo)
+                            sudo_state = sudoers.delete_sudoers()
+
+                            res.update({
+                                "sudo": sudo_state
+                            })
+
+                        (rc, out, err) = user.remove_user()
+
+                        if rc != 0:
+                            res.update({
+                                "failed": True,
+                                "msg": err,
+                                "rc": rc
+                            })
+                        else:
+                            res.update({
+                                "changed": True,
+                                "msg": "user removed",
+                            })
+
+                            if self.output == "full":
+                                res.update({
+                                    "force": user.force,
+                                    "remove": user.remove,
+                                })
+
+                    else:
                         res.update({
-                          "check_mode": True,
-                          "msg": "check mode"
+                            "changed": False
                         })
+
+                elif _state == 'present':
+                    """
+                    """
+                    if not user_exists:
+                        """
+                        """
+                        if self.module.check_mode:
+                            res.update({
+                                "check_mode": True,
+                                "msg": "check mode"
+                            })
+                            # self.module.exit_json(changed=True)
+
+                        # Check to see if the provided home path contains parent directories
+                        # that do not exist.
+                        path_needs_parents = False
+                        if user.home and user.create_home:
+                            parent = os.path.dirname(user.home)
+                            if not os.path.isdir(parent):
+                                path_needs_parents = True
+
+                        (rc, out, err) = user.create_user()
+
+                        if rc == 0:
+                            res.update({
+                                "changed": True,
+                                "msg": "User successful created",
+                            })
+
+                        # If the home path had parent directories that needed to be created,
+                        # make sure file permissions are correct in the created home directory.
+                        if path_needs_parents:
+                            info = user.user_info()
+
+                            if info is not False:
+                                user.chown_homedir(info[2], info[3], user.home)
+
+                        if self.output == "full":
+                            if self.module.check_mode:
+                                res.update({
+                                    "system": user.name
+                                })
+                            else:
+                                res.update({
+                                    "system": user.system,
+                                    "create_home": user.create_home
+                                })
+
+                    else:
+                        # modify user (note: this function is check mode aware)
+                        # self.module.log(msg="    - modify user")
+                        (rc, out, err) = user.modify_user()
+
+                        if rc is None:
+                            res.update({
+                                "changed": False
+                            })
+
+                    if rc is not None and rc != 0:
+                        res.update({
+                            "failed": True,
+                            "msg": err,
+                            "rc": rc,
+                        })
+
+                    if self.output == "full":
+                        if user.password is not None:
+                            res['password'] = 'NOT_LOGGING_PASSWORD'
 
                     if _authorized_keys:
                         auth_keys.user(user, _authorized_keys)
-                        authorized_keys_state = auth_keys.remove(_authorized_key_directory)
+                        authorized_keys_state = auth_keys.save(_authorized_key_directory)
 
                         res.update({
-                          "authorized_key": authorized_keys_state
+                            # "changed": authorized_keys_state,
+                            "authorized_key": authorized_keys_state
                         })
 
-                    self.module.log(msg="    - remove user")
-                    (rc, out, err) = user.remove_user()
+                    if _ssh_keys:
+                        ssh_keys.user(user, _ssh_keys)
+                        ssh_keys_state = ssh_keys.save()
 
-                    self.module.log(msg=f"    - rc : {rc}")
-                    self.module.log(msg=f"    - out: {out}")
-                    self.module.log(msg=f"    - err: {err}")
-
-                    if rc != 0:
                         res.update({
-                          "failed": True,
-                          "msg": err,
-                          "rc": rc
-                        })
-                        # self.module.fail_json(name=user.username, msg=err, rc=rc)
-                    else:
-                      res.update({
-                        "force": user.force,
-                        "remove": user.remove,
-                        "msg": "user removed",
-                      })
-                    #res['force'] = user.force
-                    #res['remove'] = user.remove
-                else:
-                    res.update({
-                        "changed": False
-                    })
-
-
-            elif _state == 'present':
-                """
-                """
-                if not user_exists:
-                    """
-                    """
-                    if self.module.check_mode:
-                        res.update({
-                          "check_mode": True,
-                          "msg": "check mode"
-                        })
-                        # self.module.exit_json(changed=True)
-
-                    # Check to see if the provided home path contains parent directories
-                    # that do not exist.
-                    path_needs_parents = False
-                    if user.home and user.create_home:
-                        parent = os.path.dirname(user.home)
-                        if not os.path.isdir(parent):
-                            path_needs_parents = True
-
-                    self.module.log(msg="    - create user")
-                    (rc, out, err) = user.create_user()
-
-                    self.module.log(msg=f"    - rc : {rc}")
-                    self.module.log(msg=f"    - out: {out}")
-                    self.module.log(msg=f"    - err: {err}")
-
-                    if rc == 0:
-                        res.update({
-                            "changed": True,
-                            "msg": "User successful created",
+                            # "changed": ssh_keys_state,
+                            "ssh_keys": ssh_keys_state
                         })
 
-                    # If the home path had parent directories that needed to be created,
-                    # make sure file permissions are correct in the created home directory.
-                    if path_needs_parents:
-                        info = user.user_info()
+                    # sudoers file
+                    sudoers.user(user, _sudo)
 
-                        self.module.log(msg=f"    - user info: {info}")
+                    sudo_state = None
+                    sudo_changed = None
+                    sudo_failed = None
 
-                        if info is not False:
-                            user.chown_homedir(info[2], info[3], user.home)
+                    if _sudo:
+                        self.module.log(msg="create sudoers")
+                        sudo_state = sudoers.create_sudoers()
 
-                    if self.module.check_mode:
+                        sudo_changed = sudo_state.get("changed", False)
+                        sudo_failed = sudo_state.get("failed", False)
+
                         res.update({
-                            "system": user.name
+                            "changed": sudo_changed,
+                            "failed": sudo_failed,
                         })
                     else:
+                        sudo_state = sudoers.delete_sudoers()
+
+                    if sudo_state:
                         res.update({
-                          "system": user.system,
-                          "create_home": user.create_home
+                            "sudo": sudo_state
                         })
-                        # res['system'] = user.system
-                        # res['create_home'] = user.create_home
-                else:
-                    # modify user (note: this function is check mode aware)
-                    self.module.log(msg="    - modify user")
-                    (rc, out, err) = user.modify_user()
-
-                    self.module.log(msg=f"    - rc : {rc}")
-                    self.module.log(msg=f"    - out: {out}")
-                    self.module.log(msg=f"    - err: {err}")
-
-                    if rc is None:
-                        res.update({
-                          "changed": False
-                        })
-
-                    # res.update({
-                    #   "append": user.append,
-                    #   "move_home": user.move_home,
-                    #   "msg": err,
-                    #   "rc": rc,
-                    # })
-
-                if rc is not None and rc != 0:
-                    res.update({
-                      "failed": True,
-                      "msg": err,
-                      "rc": rc,
-                    })
-                    # self.module.fail_json(name=user.username, msg=err, rc=rc)
-
-                if user.password is not None:
-                    res['password'] = 'NOT_LOGGING_PASSWORD'
-
-                if _authorized_keys:
-                    auth_keys.user(user, _authorized_keys)
-                    authorized_keys_state = auth_keys.save(_authorized_key_directory)
-
-                    res.update({
-                      "authorized_key": authorized_keys_state
-                    })
-
-                if _ssh_keys:
-                    ssh_keys.user(user, _ssh_keys)
-                    ssh_keys_state = ssh_keys.save()
-
-                    res.update({
-                      "ssh_keys": ssh_keys_state
-                    })
-
 
             result[_username] = res
 
-        self.module.log(msg="-----------------------------------------------------------")
+            self.module.log(msg="-----------------------------------------------------------")
 
-        self.module.log(msg=f"  = {result}")
+        # self.module.log(msg="-----------------------------------------------------------")
+        # self.module.log(msg=f"{result}")
+        # self.module.log(msg="-----------------------------------------------------------")
 
-        self.module.log(msg="-----------------------------------------------------------")
+        result_changed = {k: v for k, v in result.items() if v.get('changed')}
+        result_failed  = {k: v for k, v in result.items() if v.get('failed')}
 
-        # result.update({"failed": False})
+        # find all changed and define our variable
+        changed = (len(result_changed) > 0)
+        # find all failed and define our variable
+        failed = (len(result_failed) > 0)
 
-        # return result
-
-        return dict(
-            failed = False,
-            changed = False,
-            result = result,
+        final_result = dict(
+            failed = failed,
+            changed = changed
         )
+
+        if changed:
+            final_result.update({
+                "result_changed": result_changed
+            })
+
+        if failed:
+            final_result.update({
+                "result_failed": result_failed
+            })
+
+        if self.output == "full":
+            final_result.update({
+                "output": result
+            })
+
+        return final_result
 
 
 # ---------------------------------------------------------------------------------------
@@ -1169,18 +1287,24 @@ class Users():
 #
 
 def main():
-    ''' ... '''
+    """
+    """
     module = AnsibleModule(
         argument_spec=dict(
             users = dict(
                 required = True,
                 type = "list"
+            ),
+            output = dict(
+                type = 'str',
+                default = 'compact',
+                choices = ['compact', 'full']
             )
         ),
         supports_check_mode=False,
     )
 
-    u = Users(module)
+    u = MultiUsers(module)
     result = u.run()
 
     module.log(msg=f"= result : '{result}'")

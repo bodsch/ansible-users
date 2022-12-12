@@ -1,23 +1,15 @@
 ---
 
 - name: create multiple users
-  users:
+  multi_users:
     users: "{{ users }}"
+    output: "{{ users_output }}"
+  register: _users_result
 
-- name: create user sudoers file and validate
-  ansible.builtin.lineinfile:
-    dest: /etc/sudoers
-    state: "{{ item.user_state | default('present', true) }}"
-    regexp: '^{{ item.username }} '
-    line: "{{ item.username }} ALL=(ALL) {{ 'NOPASSWD:' if (item.use_sudo_nopass | default(false)) else '' }}ALL"
-    validate: 'visudo -cf %s'
-  environment:
-    PATH: /usr/sbin:/usr/local/sbin:/sbin
+- name: summary
+  debug:
+    msg: "{{ _users_result }}"
   when:
-    - item.use_sudo | default(false)
-  loop:
-    "{{ present_users }}"
-  loop_control:
-    label: "username: {{ item.username }}"
+    - _users_result is defined
 
 ...

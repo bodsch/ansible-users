@@ -43,6 +43,23 @@ mkpasswd --method=SHA-512
 python -c 'import crypt,getpass; print(crypt.crypt(getpass.getpass(), crypt.mksalt(crypt.METHOD_SHA512)))'
 ```
 
+
+```bash
+# MD5 (OBSOLETE!)
+openssl passwd -1  -salt 5RPVAd clear-text-passwd43
+
+# SHA-256
+openssl passwd -5  -salt 5RPVAd clear-text-passwd43
+
+# SHA-512
+openssl passwd -6  -salt 5RPVAd clear-text-passwd43
+
+# blowfish
+python -c 'import bcrypt; print(bcrypt.hashpw(b"clear-text-passwd43", bcrypt.gensalt(rounds=15)).decode("ascii"))'
+```
+
+
+
 ## Default Settings
 
 ```yaml

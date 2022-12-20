@@ -1151,48 +1151,53 @@ class Sudoers(UsersHelper):
         self.user_info()
         self.file_name = os.path.join(self.sudoers_path, self.user_name)
 
-        if isinstance(self.commands, str):
-            commands = [self.commands]
-        else:
-            commands = self.commands
+        if self.nopassword:
+            """
+            """
+            if isinstance(self.commands, str):
+                commands = [self.commands]
+            else:
+                commands = self.commands
 
-        self.commands = commands
+            self.commands = commands
 
-        # self.module.log(msg=f"  sudoers file {self.file_name}")
-        # self.module.log(msg=f"  sudoers data {self.sudo_data} {len(self.sudo_data)}")
+            # self.module.log(msg=f"  sudoers file {self.file_name}")
+            # self.module.log(msg=f"  sudoers data {self.sudo_data} {len(self.sudo_data)}")
 
-        if len(self.sudo_data) == 0:
-            return dict(
-                changed = False,
-                failed = False
-            )
-
-        content = self.content()
-
-        # self.module.log(msg=f"  content {content}")
-
-        if not self.verify_files(self.file_name, content):
-            # changed keys
-            self.save_file(file_name=self.file_name, data=content, mode="0440")
-
-            # validate created sudoers rule
-            valid, msg = self.validate(self.file_name)
-            # self.module.log(msg=f"  valid {valid}")
-
-            if not valid:
-                self.module.log(msg=f"  ERROR {msg}")
-                self.delete_sudoers()
-
+            if len(self.sudo_data) == 0:
                 return dict(
-                    failed = True,
-                    msg = msg
+                    changed = False,
+                    failed = False
                 )
 
-            self.changed = True
+            content = self.content()
 
-        return dict(
-            changed=self.changed
-        )
+            self.module.log(msg=f"  content {content}")
+
+            if not self.verify_files(self.file_name, content):
+                # changed keys
+                self.save_file(file_name=self.file_name, data=content, mode="0440")
+
+                # validate created sudoers rule
+                valid, msg = self.validate(self.file_name)
+                # self.module.log(msg=f"  valid {valid}")
+
+                if not valid:
+                    self.module.log(msg=f"  ERROR {msg}")
+                    self.delete_sudoers()
+
+                    return dict(
+                        failed = True,
+                        msg = msg
+                    )
+
+                self.changed = True
+
+            return dict(
+                changed=self.changed
+            )
+        else:
+            return self.delete_sudoers()
 
     def delete_sudoers(self):
         """
@@ -1205,6 +1210,11 @@ class Sudoers(UsersHelper):
 
             return dict(
                 changed = True,
+                failed = False
+            )
+        else:
+            return dict(
+                changed = False,
                 failed = False
             )
 

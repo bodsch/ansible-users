@@ -7,7 +7,7 @@
 
 from __future__ import absolute_import, division, print_function
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils._text import to_bytes, to_native
+from ansible.module_utils._text import to_native
 from ansible.module_utils import distro
 
 import json
@@ -17,7 +17,7 @@ import shutil
 import re
 import pwd
 import os
-import math
+# import math
 import grp
 import errno
 import base64
@@ -45,6 +45,7 @@ except ImportError:
 class SingleUser():
     """
     """
+
     def __init__(self, user, module):
         """
         """
@@ -766,7 +767,6 @@ class SingleUser():
         """
         self.module.log(msg=f"chown_homedir({uid}, {gid}, {path}, {mode})")
 
-
         if mode:
             os.chmod(path, int(mode, base=8))
 
@@ -830,6 +830,7 @@ class SingleUser():
 
         return (rc, out, err)
 
+
 class UsersHelper():
     module = None
 
@@ -855,15 +856,18 @@ class UsersHelper():
 
         # self.module.log(msg=f"    - user_name: {self.user_name}, uid: {self.uid}, gid: {self.gid}, home: {self.user_home}")
 
-    def create_directory(self, path, mode="0700"):
+    def create_directory(self, path, uid=None, gid=None, mode="0700"):
         """
         """
+        self.module.log(msg=f"create_directory(self, {path}, {uid} {gid}, {mode})")
+
         try:
             os.makedirs(path, exist_ok=True)
         except FileExistsError:
             pass
 
-        self.set_rights(path, self.uid, self.gid, mode)
+        if uid and gid:
+            self.set_rights(path, self.uid, self.gid, mode)
 
     def remove_directory(self, path):
         """
@@ -910,7 +914,7 @@ class UsersHelper():
 
         return result
 
-    def save_file(self, file_name, data, mode="0600"):
+    def save_file(self, file_name, data, uid=None, gid=None, mode="0600"):
         """
         """
         # self.module.log(msg=f"save_file(self, {file_name}, data, {mode})")
@@ -924,7 +928,8 @@ class UsersHelper():
             else:
                 fp.write(data)
 
-        self.set_rights(file_name, self.uid, self.gid, mode)
+        if uid and gid:
+            self.set_rights(file_name, uid, gid, mode)
 
         pass
 
@@ -942,7 +947,7 @@ class UsersHelper():
     def set_rights(self, path, owner = None, group = None, mode = None):
         """
         """
-        # self.module.log(msg=f"set_rights(self, {path}, {owner} {group}, {mode})")
+        self.module.log(msg=f"set_rights(self, {path}, {owner} {group}, {mode})")
 
         if mode is not None:
             os.chmod(path, int(mode, base=8))
@@ -1002,26 +1007,34 @@ class AuthorizedKeys(UsersHelper):
     def save(self, path = None):
         """
         """
+        self.module.log(msg=f"save(self, {path})")
+
         self.user_info()
 
         if self.authorized_keys and len(self.authorized_keys) > 0:
             """
             """
+            _uid = None
+            _gid = None
+            self.module.log(msg=f"  - {self.authorized_keys}")
+
             if not path:
                 path = os.path.join(self.user_home, ".ssh")
                 _authorized_key_directory_mode = "0700"
+                _uid = self.uid
+                _gid = self.gid
                 _authorized_key_file = os.path.join(path, "authorized_keys")
             else:
-                _authorized_key_directory_mode = "0750"
+                _authorized_key_directory_mode = "0755"
                 _authorized_key_file = os.path.join(path, self.user_name)
 
-            # self.module.log(msg=f"    - key file: {_authorized_key_file}")
+            self.module.log(msg=f"    - key file: {_authorized_key_file}")
 
-            self.create_directory(path, _authorized_key_directory_mode)
+            self.create_directory(path, uid=_uid, gid=_gid, mode=_authorized_key_directory_mode)
 
             if not self.verify_files(_authorized_key_file, self.authorized_keys):
                 # changed keys
-                self.save_file(file_name=_authorized_key_file, data=self.authorized_keys, mode="0600")
+                self.save_file(file_name=_authorized_key_file, data=self.authorized_keys, uid=_uid, gid=_gid, mode="0600")
 
                 self.changed = True
 
@@ -1072,7 +1085,7 @@ class SshKeys(UsersHelper):
 
         path = os.path.join(self.user_home, ".ssh")
 
-        self.create_directory(path, "0700")
+        self.create_directory(path, mode="0700")
 
         if isinstance(self.ssh_keys, dict):
             for key, value in self.ssh_keys.items():
@@ -1109,21 +1122,20 @@ class Sudoers(UsersHelper):
         self.file_name = None
         self.commands = []
 
-
     def user(self, user, sudo_data):
         """
         """
         self.user_data = user
 
-        #self.user_info()
+        # self.user_info()
 
-        #self.user = self.user_name
+        # self.user = self.user_name
         self.nopassword = sudo_data.get('nopassword', False)
         self.runas = sudo_data.get('runas', None)
         self.group = sudo_data.get('group', None)
         self.sudoers_path = sudo_data.get('sudoers_path', '/etc/sudoers.d')
         # self.file_name = os.path.join(self.sudoers_path, self.user_name)
-        self.commands = sudo_data.get('commands')
+        self.commands = sudo_data.get('commands', [])
 
         self.sudo_data = sudo_data
 
@@ -1161,7 +1173,7 @@ class Sudoers(UsersHelper):
 
         if not self.verify_files(self.file_name, content):
             # changed keys
-            self.save_file(file_name=self.file_name, data=content, mode="0755")
+            self.save_file(file_name=self.file_name, data=content, mode="0440")
 
             # validate created sudoers rule
             valid, msg = self.validate(self.file_name)
@@ -1195,7 +1207,6 @@ class Sudoers(UsersHelper):
                 changed = True,
                 failed = False
             )
-
 
     def content(self):
         nopasswd_str = ""
@@ -1232,10 +1243,11 @@ class Sudoers(UsersHelper):
 
         if rc != 0:
             result = False
-            msg = f"Failed to validate sudoers rule:\n{stdout}\n{stderr}" # '.format(stdout=stdout))
+            msg = f"Failed to validate sudoers rule:\n{stdout}\n{stderr}"  # '.format(stdout=stdout))
             # raise Exception('Failed to validate sudoers rule:\n{stdout}'.format(stdout=stdout))
 
         return (result, msg)
+
 
 class MultiUsers():
     """

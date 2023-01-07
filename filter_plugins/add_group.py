@@ -62,6 +62,8 @@ class FilterModule(object):
         result = []
 
         for u in data:
+            display.v(f"{u}")
+
             username = u.get("username", None)
             user_state = u.get("state", None)
 

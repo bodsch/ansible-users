@@ -4,16 +4,21 @@
   ansible.builtin.set_fact:
     non_valid_users: "{{ users | validate_state }}"
 
-- name: d
-  ansible.builtin.debug:
-    msg: "{{ non_valid_users | default([]) }}"
+- name: result for validation
+  when:
+    - non_valid_users is defined
+    - non_valid_users | count > 0
+  block:
+    - name: result for validation
+      ansible.builtin.debug:
+        msg: "{{ non_valid_users | default([]) }}"
 
-- name: Fail when username or user_state are not defined
-  ansible.builtin.assert:
-    that:
-      - non_valid_users is defined
-      - non_valid_users | count == 0
-    quiet: true
+    - name: Fail when username or user_state are not defined
+      ansible.builtin.assert:
+        that:
+          - non_valid_users is defined
+          - non_valid_users | count == 0
+        quiet: true
 
 # - name: Fail when username or user_state are not defined
 #   ansible.builtin.assert:

@@ -21,7 +21,7 @@
   vars:
     users:
       - username: blonde_feared
-        user_state: absent
+        state: absent
 
   roles:
     - role: ansible-users

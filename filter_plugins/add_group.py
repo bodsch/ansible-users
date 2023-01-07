@@ -67,7 +67,7 @@ class FilterModule(object):
 
             display.v(f"  - user : {username} / {user_state}")
 
-            if not user_state in ["present", "absent", "lock"]:
+            if user_state not in ["present", "absent", "lock"]:
                 result.append(username)
 
         return result

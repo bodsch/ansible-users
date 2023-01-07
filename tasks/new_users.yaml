@@ -1,13 +1,13 @@
 ---
 
-- name: create multiple users
+- name: create multiple users  # noqa args[module]
   multi_users:
     users: "{{ users }}"
-    output: "{{ users_output }}"
+    output: "{{ users_output | default('compact') }}"
   register: _users_result
 
 - name: summary
-  debug:
+  ansible.builtin.debug:
     msg: "{{ _users_result }}"
   when:
     - _users_result is defined

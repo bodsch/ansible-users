@@ -3,15 +3,15 @@
 
 Role to manage multiple users on linux.
 
-
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/bodsch/ansible-users/CI)][ci]
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bodsch/ansible-users/main.yml?branch=main)][ci]
 [![GitHub issues](https://img.shields.io/github/issues/bodsch/ansible-users)][issues]
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/bodsch/ansible-users)][releases]
+[![Ansible Quality Score](https://img.shields.io/ansible/quality/50067?label=role%20quality)][quality]
 
 [ci]: https://github.com/bodsch/ansible-users/actions
 [issues]: https://github.com/bodsch/ansible-users/issues?q=is%3Aopen+is%3Aissue
 [releases]: https://github.com/bodsch/ansible-users/releases
-
+[quality]: https://galaxy.ansible.com/bodsch/users
 
 Add users, change passwords, lock/unlock user accounts, manage sudo access (per user), add ssh key(s) for sshkey based authentication.
 

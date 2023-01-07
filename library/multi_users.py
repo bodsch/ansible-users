@@ -126,7 +126,9 @@ class SingleUser():
                         """
                         if algorithm == '1':
                             is_invalid = True
-                            invalid_msg = "The password entered seems to have been hashed, but with the outdated MD5 algorithm!\nThis algorithm is no longer supported!\nPlease create a new password with a modern hash algorithm (SHA-256, SHA-512, Blowfish)."
+                            invalid_msg = "The password entered seems to have been hashed, but with the outdated MD5 algorithm!\n"
+                            invalid_msg += "This algorithm is no longer supported!\n"
+                            invalid_msg += "Please create a new password with a modern hash algorithm (SHA-256, SHA-512, Blowfish)."
                         else:
                             is_invalid = False
 

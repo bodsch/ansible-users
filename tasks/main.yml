@@ -5,11 +5,6 @@
   tags:
     - users
 
-# - name: remove users
-#   ansible.builtin.include_tasks: remove_users.yaml
-#   tags:
-#     - users_remove
-
 - name: add users
   ansible.builtin.include_tasks: new_users.yaml
   tags:

@@ -1,0 +1,28 @@
+---
+
+- name: create users
+  hosts: all
+  any_errors_fatal: false
+
+  environment:
+    NETRC: ''
+
+  roles:
+    - role: ansible-users
+
+# - name: remove user
+#   hosts: all
+#   any_errors_fatal: false
+#
+#   environment:
+#     NETRC: ''
+#
+#   vars:
+#     users:
+#       - username: blonde_feared
+#         user_state: absent
+#
+#   roles:
+#     - role: ansible-users
+
+...

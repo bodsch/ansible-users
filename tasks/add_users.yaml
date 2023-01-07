@@ -1,5 +1,9 @@
 ---
 
+#- name: create multiple users
+#  users:
+#    users: "{{ users }}"
+
 - name: create users, with home directories
   ansible.builtin.user:
     name: "{{ item.username }}"

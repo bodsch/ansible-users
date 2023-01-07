@@ -1,0 +1,108 @@
+---
+users:
+  - username: foo-bar
+    update_password: always
+    comment: Foo Bar
+    # password: foo-barbar
+    shell: /bin/bash
+    ssh_keys:
+      id_ed25519: |
+          -----BEGIN OPENSSH PRIVATE KEY-----
+          b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABAXYpRZio
+          BDw+o+oic9MwrqAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIK6jjUFopFO9kV4G
+          WIkR0gNzpoaOgpwFFRLWKcpeG8THAAAAkHtt03xiYPgAEc7T0nEtnCjt67sN6msNP2Nxgv
+          +Fd8BANdzbYFzsMoQ45Ldja2gsOt1KAecwO+xY+5BRCA0huWCTHwbd7Y6BqCKLEpHwXWG1
+          UI4GzDt6+hD1LZSbYTFpi+LhiQ1PlrmG5eRQOXzlEAY6AziN7gajlQRsOxkmTW98DuVzWw
+          S/KVZZ/wwzyaIPYQ==
+          -----END OPENSSH PRIVATE KEY-----
+      id_ed25519.pub: ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
+
+      id_rsa: "LS0tLS1CRUdJTiBPUEVOU1NIIFBSSVZBVEUgS0VZLS0tLS0KaCtmZVZZQVg1Sm1EM2QvdEx6UkxUbTBmUm5CL1NVTDFFQ21jK1gwZ3dLL3UvUG4zU2RJOE0zVk9aMUJkUWJNNjkrU2oyYgozLzRRN1NsbUZObEVXaG43M2VHUFhTTTBLU1VUcGk5bFk0dVJndEhDdGYrejhsaVNBNFlvRlJKcTcxYi9JWHZ1SkUxVks1Ck5jQ3dSUFZRSGRUc0VEdG52M09lNDdFbW9XWFgzOUdFazRoQWNqV1BoeVRvZWFvSWNYTXZDbkVTMXp6SS8wQ2RsVUo2TGEKU1p4Njk2aFE0a1dPZ2k5UE0vVERHdytBRDZGbGVNTUtTK0FtalNuWHBYTjMwTzVacTFuMEhEWGd4ak55VVZ4SjdEVUNDMgpwZ2p1RHpPdDF3QUFBOGhNeC9oMlRNZjRkZ0FBQUFkemMyZ3Rjbk5oQUFBQkFRQytDRGdQYzllZnhvcWZQKzNoc0FBOFMvCm1Kb04wR2xwc2haNEZNNnVrWFdWc3RTQS9ONmJPSDU5NVZnQmZrbVlQZDMrMHZORXRPYlI5R2NIOUpRdlVRS1p6NWZTREEKcis3OCtmZEowand6ZFU1blVGMUJzenIzNUtQWnZmL2hEdEtXWVUyVVJhR2Z2ZDRZOWRJelFwSlJPbUwyVmppNUdDMGNLMQovN1B5V0pJRGhpZ1ZFbXJ2VnY4aGUrNGtUVlVyazF3TEJFOVZBZDFPd1FPMmUvYzU3anNTYWhaZGZmMFlTVGlFQnlOWStICklqNTlnck8ydldDa3JSTTd1Vk9sTUEzSnQ2ZDVkSDE4RDN5Vk5HWHB5dnVROUxXWUxWUGdvMlVUV0lVV3VHR2djVXNydVYKVm8xYm1HUTBsSnlQTkpVUmdUTnJ4dGd0emdEdUdoWWZGMzU2QVJkaHVUeXhBQUFBZ1FDT2hlMHF1bzhlakphalM0dUxydApqTkg2b1FNaWF3NGxMMkJtTWlMc3I5STdVWE5BMXZhRzl6R2J6Ym5wS3pSV0VKMWIxRExUWm42bnRMR2l1UVlCaGNuRUx5CnF3aVdrUDlqNnFZd2NtNlJ3b2tkTGMzWHkvdzdrZXluUVU5SlR4YlVtSGpLQnNKRW9YaGUyS1JVNlhDK0pLYm16cHF3M1QKbkpKcXdodVFNWjBXN3lBMzdheWtYenpLejV2Qlpac1pvekY4MEpXc3FITHBXMTh4ZCtoM1JxWDB3c1dUcjVLcUxWdEN6bgp0UzBKYTl6TXppTWp6S2Z2RDRlT0wwR3NWTXdFc042SUM1bGhkYjdBcGRHTkwyVVpzQUFBQ0JBTVZIc2EwaEFTYW01MVdUCkJkRW5HNjNJZkhwcjhFWjFBQUFBRDJKdlpITmphRUJrWVhKclkybDBlUUVDQXc9PQotLS0tLUVORCBPUEVOU1NIIFBSSVZBVEUgS0VZLS0tLS0K"
+      id_rsa.pub: "c3NoLXJzYSBBQUFBQjNOemFDMXljMkVBQUFBREFRQUJBQUFCQTVWZ0Jma21ZUGQzKzB2TkV0T2JSOUdjSDlKUXZVUUtaejVmU0RBTzJlL2M1N2pzU2FoWmRmZjBZU1RpRUJ5TlkrSEpPaGRlbGMzZlE3bG1yV2ZRY05lREdNM0pSWEVuc05RSUxhbUNPNFBNNjNYIGJhckBkZm9vYmFyLmNvbQo="
+    sudo:
+      nopassword: true
+      runas: "ALL"
+      commands:
+        - ALL
+        - /bin/systemctl restart my-service
+        - /bin/systemctl reload my-service
+      group: wheel
+    state: present
+  #
+  - username: bodsch
+    comment: Bodo Schulz
+    password: $6$ptDt6US1NuMioXBL$QVbF04V0Cpj12w1t1YxY7Yw.yqT8RQz1ahT0soYWvJI/1dlZMX19pPXGZn5fn0YQpjS/5ml.sKRCZFt0aPZIa.
+    update_password: on_create
+    shell: /bin/bash
+    authorized_key_directory: /etc/ssh/authorized_key
+    authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lYDI1NTE5AAAAIL+LmfwIhn8kxZcyusbcITtwsAOnI1I/d/c40XnGBg7J bar.foo <bar.foo@test.com>
+      - ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBACQI0Z8 root <root@test.com>
+    state: present
+    # remove home directory too
+    remove: true
+
+  - username: user_01
+    state: present
+
+  - username: user_02
+    state: present
+
+  - username: user_03
+    state: present
+
+  - username: user_04
+    state: present
+
+  - username: user_05
+    state: present
+
+  - username: user_06
+    state: present
+
+  - username: user_07
+    state: present
+
+  - username: user_08
+    state: present
+
+  - username: user_09
+    state: present
+
+  - username: user_10
+    state: present
+
+  - username: user_11
+    state: present
+
+  - username: user_12
+    state: present
+
+  - username: user_13
+    state: present
+
+  - username: user_14
+    state: present
+
+  - username: user_15
+    state: present
+
+  - username: user_16
+    state: present
+
+  - username: user_17
+    state: present
+
+  - username: user_18
+    state: present
+    remove: true
+
+  - username: user_19
+    state: present
+    remove: true
+
+  - username: user_20
+    state: absent
+    remove: true
+
+...

@@ -15,7 +15,8 @@ class FilterModule(object):
     def filters(self):
         return {
             'add_primary_group': self.add_primary,
-            'user_state': self.user_state
+            'user_state': self.user_state,
+            'validate_state': self.validate_state
         }
 
     def add_primary(self, users, groups):
@@ -25,8 +26,8 @@ class FilterModule(object):
 
         for u in users:
             username = u.get('username')
-            user_state = u.get('user_state')
-            # display.vv(f"  - user : {username} / {user_state}")
+            user_state = u.get('state')
+            display.v(f"  - user : {username} / {user_state}")
 
             if user_state == 'absent':
                 continue
@@ -35,12 +36,12 @@ class FilterModule(object):
                 try:
                     primary_group = g.get('ansible_facts').get('getent_group').get(username)
                     if primary_group:
-                        # display.vv(f"  - g : {primary_group[1]}")
+                        display.v(f"  - g : {primary_group[1]}")
                         u['primary_group'] = primary_group[1]
                 except Exception:
                     pass
 
-        # display.vvv(f"return {users}")
+        display.v(f"return {users}")
 
         return users
 
@@ -50,7 +51,23 @@ class FilterModule(object):
         result = []
 
         for u in users:
-            if u.get('user_state', "absent") == 'absent':
+            if u.get('state', "absent") == 'absent':
                 result.append(u)
+
+        return result
+
+    def validate_state(self, data):
+        """
+        """
+        result = []
+
+        for u in data:
+            username = u.get("username", None)
+            user_state = u.get("state", None)
+
+            display.v(f"  - user : {username} / {user_state}")
+
+            if not user_state in ["present", "absent", "lock"]:
+                result.append(username)
 
         return result

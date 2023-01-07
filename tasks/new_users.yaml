@@ -1,0 +1,15 @@
+---
+
+- name: create multiple users
+  multi_users:
+    users: "{{ users }}"
+    output: "{{ users_output }}"
+  register: _users_result
+
+- name: summary
+  debug:
+    msg: "{{ _users_result }}"
+  when:
+    - _users_result is defined
+
+...

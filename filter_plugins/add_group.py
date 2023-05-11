@@ -51,7 +51,7 @@ class FilterModule(object):
         result = []
 
         for u in users:
-            if u.get('state', "absent") == 'absent':
+            if u.get('state', "absent") == state:
                 result.append(u)
 
         return result

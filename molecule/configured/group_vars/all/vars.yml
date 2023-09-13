@@ -1,6 +1,7 @@
 ---
 users:
   - username: foo-bar
+    uid: 2000
     update_password: always
     comment: Foo Bar
     # password: foo-barbar

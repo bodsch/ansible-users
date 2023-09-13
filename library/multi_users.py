@@ -73,6 +73,7 @@ class SingleUser():
         self.state = user.get("state")
         self.system = user.get("system", False)
         self.uid = user.get("uid", None)
+        self.non_unique = user.get("non_unique", None)
         self.umask = user.get("umask", None)
         self.update_password = user.get("update_password", 'always')
         self.username = user.get("username")
@@ -300,7 +301,7 @@ class SingleUser():
 
         if self.uid is not None:
             args.append('-u')
-            args.append(self.uid)
+            args.append(str(self.uid))
 
             if self.non_unique:
                 args.append('-o')

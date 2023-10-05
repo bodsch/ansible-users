@@ -2,7 +2,6 @@
 
 galaxy_info:
   role_name: users
-  namespace: bodsch
 
   author: Bodo Schulz
   description: ansible role to manage users on linux

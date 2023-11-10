@@ -21,8 +21,8 @@ Tested on
 
 * Arch Linux
 * Debian based
-    - Debian 11 / 12
-    - Ubuntu 20.10 / 22.10
+    - Debian 10 / 11 / 12
+    - Ubuntu 20.04 / 22.04
 
 > **RedHat-based systems are no longer officially supported! May work, but does not have to.**
 
@@ -205,4 +205,4 @@ see [molecule tests](molecule/development/group_vars/all/vars.yml)
 
 [MIT](LICENSE)
 
-`FREE SOFTWARE, HELL YEAH!`
+**FREE SOFTWARE, HELL YEAH!**

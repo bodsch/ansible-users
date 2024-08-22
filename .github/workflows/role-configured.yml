@@ -9,15 +9,19 @@ on:
     types:
       - completed
 
+env:
+  PY_COLORS: '1'
+  ANSIBLE_FORCE_COLOR: '1'
+
 defaults:
   run:
     working-directory: 'ansible-users'
 
 jobs:
 
-  deb:
-    name: "${{ matrix.image }} / ansible: ${{ matrix.ansible-version }}"
-    runs-on: ubuntu-20.04
+  debian:
+    name: "${{ matrix.image }}: ${{ matrix.collection_role }} (ansible ${{ matrix.ansible-version }}, python ${{ matrix.python_version }})"
+    runs-on: ubuntu-22.04
     if: ${{ github.event_name == 'schedule' || github.event.workflow_run.conclusion == 'success' }}
     strategy:
       fail-fast: false
@@ -25,9 +29,9 @@ jobs:
         image:
           - debian:12
         python_version:
-          - "3.11.3"
+          - "3.11"
         ansible-version:
-          - "6.7"
+          - "8.5"
         scenario:
           - configured
 
@@ -48,6 +52,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r test-requirements.txt
 
+      - name: force reinstall of community.docker
+        run: |
+          mkdir -p /home/runner/.ansible/collections
+          ansible-galaxy collection install community.docker --force
+
       - name: test default
         run: |
           make \
@@ -55,7 +64,3 @@ jobs:
             -e TOX_SCENARIO="${{ matrix.scenario }}" \
             -e TOX_ANSIBLE="ansible_${{ matrix.ansible-version }}" \
             -e DISTRIBUTION="${{ matrix.image }}"
-        env:
-          PY_COLORS: '1'
-          ANSIBLE_FORCE_COLOR: '1'
-          DISTRIBUTION: ${{ matrix.image }}

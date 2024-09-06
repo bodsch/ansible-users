@@ -1,4 +1,7 @@
 ---
+
+users_output: "full"
+
 users:
   - username: foo-bar
     update_password: always
@@ -44,6 +47,10 @@ users:
 
   - username: user_01
     state: present
+    group: users
+    groups:
+      - user_08
+      - user_15
 
   - username: user_02
     state: present

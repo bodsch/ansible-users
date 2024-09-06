@@ -104,7 +104,7 @@ def get_vars(host):
     "/home/foo-bar",
     "/home/foo-bar/.ssh",
     "/home/bodsch",
-    "/home/bodsch/.ssh",
+    "/etc/ssh/authorized_key",
 ])
 def test_directories(host, dirs):
     d = host.file(dirs)
@@ -115,6 +115,7 @@ def test_directories(host, dirs):
 @pytest.mark.parametrize("files", [
     "/home/foo-bar/.bashrc",
     "/home/bodsch/.bashrc",
+    "/etc/ssh/authorized_key/bodsch",
 ])
 def test_files(host, files):
     f = host.file(files)

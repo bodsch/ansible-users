@@ -6,12 +6,12 @@ Role to manage multiple users on linux.
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bodsch/ansible-users/main.yml?branch=main)][ci]
 [![GitHub issues](https://img.shields.io/github/issues/bodsch/ansible-users)][issues]
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/bodsch/ansible-users)][releases]
-[![Ansible Quality Score](https://img.shields.io/ansible/quality/50067?label=role%20quality)][quality]
+[![Ansible Downloads](https://img.shields.io/ansible/role/d/bodsch/users?logo=ansible)][galaxy]
 
 [ci]: https://github.com/bodsch/ansible-users/actions
 [issues]: https://github.com/bodsch/ansible-users/issues?q=is%3Aopen+is%3Aissue
 [releases]: https://github.com/bodsch/ansible-users/releases
-[quality]: https://galaxy.ansible.com/bodsch/users
+[galaxy]: https://galaxy.ansible.com/ui/standalone/roles/bodsch/users
 
 Add users, change passwords, lock/unlock user accounts, manage sudo access (per user), add ssh key(s) for sshkey based authentication.
 
@@ -75,18 +75,19 @@ users: []
 | :------------------        | :----:      | :-----        | :-----------                                                   |
 | `username`                 |             | **required**  | username - no spaces                                           |
 | `uid`                      |             | optional      | The numerical value of the user's ID                           |
-| `state`                    |             | **required**  | `present` / `absent` / `lock`                                  |
-| `password`                 |             | optional      | sha512 encrypted password. If not set, password is set to `!`  |
+| `state`                    | ` `         | **required**  | `present` / `absent` / `lock`                                  |
+| `password`                 | ` `         | optional      | sha512 encrypted password. If not set, password is set to `!`  |
 | `update_password`          | `always`    | optional      | `always` / `on_create`.<br>**NOTE**: when `always`, password will be change to password value.<br>If you are using `always` on an **existing** users, **make sure to have the password set**. |
-| `comment`                  |             | optional      | Full name and Department or description of application (But you should set this!) |
-| `groups`                   |             | optional      | Comma separated list of groups the user will be added to (appended).<br>If group doesn't exist it will be created on the specific server. This is not the primary group (primary group is not modified) |
+| `comment`                  | ` `         | optional      | Full name and Department or description of application (But you should set this!) |
+| `group`                    | ` `         | optional      | The primary Group for the User (The group **must exist** and will **not be created**!) |
+| `groups`                   | `[]`        | optional      | A list of groups the user will be added to (appended).<br>If group doesn't exist it will be created on the specific server. This is not the primary group (primary group is not modified) |
 | `shell`                    | `/bin/bash` | optional      | path to login shell                                            |
 | `authorized_key_directory` | `-`         | optional      | path for central stored ssh key e.g. `/etc/ssh/authorized_key` |
 | `authorized_keys`          | `[]`        | optional      | a list with authorized_keys. stored in `$HOME/.ssh/authorized_keys` or under `authorized_key_directory` |
-| `ssh_keys`                 |             | optional      | dictionary with varios ssh_keys. You can use this to deploy static public or private keyfiles                   |
+| `ssh_keys`                 | `{}`        | optional      | dictionary with varios ssh_keys. You can use this to deploy static public or private keyfiles                   |
 | `sudo`                     | `{}`        | optional      | a dictionary with sudo settings. (see below)                                            |
 | `remove`                   | `False`     | optional      | This only affects `state=absent`, it attempts to remove directories associated with the user. |
-
+| `password_lock`            | `True`      | optional      |  |
 
 ### `ssh_keys`
 
@@ -152,12 +153,28 @@ The following configuration options are available:
 | `commands`            | `-`       | `string` or `list` | The commands allowed by the sudoers rule.<br>Multiple can be added by passing a list of commands. |
 | `group`               | `-`       | `string`           | The name of the group for the sudoers rule. | 
 
+## group settings
+
+It is easily possible to assign an individual group to each user or to include them in several groups.
+
+**However, these groups must already have been created!**
+
+```yaml
+users:
+  - username: user_01
+    state: present
+    group: users
+    groups:
+      - user_08
+      - user_15
+```
+
 
 ## usage
 
-see [molecule tests](molecule/development/group_vars/all/vars.yml)
+see [molecule tests](molecule/configured/group_vars/all/vars.yml)
 
-```
+```yaml
 - hosts: all
   any_errors_fatal: false
 

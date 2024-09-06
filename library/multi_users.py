@@ -848,6 +848,7 @@ class UsersHelper():
     def user_info(self):
         """
         """
+        # self.module.log(msg=f"UsersHelper::user_info()")
         self.user_name, _, uid, gid, _, self.user_home, _ = self.user_data.user_info()
 
         if self.user_name == "root":
@@ -857,12 +858,12 @@ class UsersHelper():
         self.uid = str(uid)
         self.gid = str(gid)
 
-        # self.module.log(msg=f"    - user_name: {self.user_name}, uid: {self.uid}, gid: {self.gid}, home: {self.user_home}")
+        # self.module.log(msg=f"= user_name: {self.user_name}, uid: {self.uid}, gid: {self.gid}, home: {self.user_home}")
 
     def create_directory(self, path, uid=None, gid=None, mode="0700"):
         """
         """
-        self.module.log(msg=f"create_directory(self, {path}, {uid} {gid}, {mode})")
+        # self.module.log(msg=f"UsersHelper::create_directory(self, {path}, {uid} {gid}, {mode})")
 
         try:
             os.makedirs(path, exist_ok=True)
@@ -886,6 +887,7 @@ class UsersHelper():
     def verify_files(self, file_name, data):
         """
         """
+        # self.module.log(msg=f"UsersHelper::verify_files({file_name}, data)")
         _old_data = ""
         _old_checksum = ""
 
@@ -920,7 +922,7 @@ class UsersHelper():
     def save_file(self, file_name, data, uid=None, gid=None, mode="0600"):
         """
         """
-        # self.module.log(msg=f"save_file(self, {file_name}, data, {mode})")
+        # self.module.log(msg=f"UsersHelper::save_file(self, {file_name}, data, {uid}, {gid}, {mode})")
         # self.module.log(msg=f"  - {type(data)}")
 
         data_is_list = isinstance(data, list)
@@ -950,7 +952,7 @@ class UsersHelper():
     def set_rights(self, path, owner = None, group = None, mode = None):
         """
         """
-        self.module.log(msg=f"set_rights(self, {path}, {owner} {group}, {mode})")
+        # self.module.log(msg=f"UsersHelper::set_rights(self, {path}, {owner} {group}, {mode})")
 
         if mode is not None:
             os.chmod(path, int(mode, base=8))
@@ -1004,13 +1006,14 @@ class AuthorizedKeys(UsersHelper):
     def user(self, user, auth_keys = []):
         """
         """
+        # self.module.log(msg=f"AuthorizedKeys::user(self, {user}, {auth_keys})")
         self.authorized_keys = auth_keys
         self.user_data = user
 
     def save(self, path = None):
         """
         """
-        self.module.log(msg=f"save(self, {path})")
+        # self.module.log(msg=f"AuthorizedKeys::save(self, {path})")
 
         self.user_info()
 
@@ -1031,7 +1034,8 @@ class AuthorizedKeys(UsersHelper):
                 _authorized_key_directory_mode = "0755"
                 _authorized_key_file = os.path.join(path, self.user_name)
 
-            self.module.log(msg=f"    - key file: {_authorized_key_file}")
+            # self.module.log(msg=f"    - key file: {_authorized_key_file}")
+            # self.module.log(msg=f"    - directory for ssh keys: {path} | modes {_uid} : {_gid}")
 
             self.create_directory(path, uid=_uid, gid=_gid, mode=_authorized_key_directory_mode)
 
@@ -1078,17 +1082,20 @@ class SshKeys(UsersHelper):
     def user(self, user, ssh_keys = {}):
         """
         """
+        # self.module.log(msg=f"SshKeys::user({user}, {ssh_keys})")
+
         self.ssh_keys = ssh_keys
         self.user_data = user
 
     def save(self):
         """
         """
+        # self.module.log(msg=f"SshKeys::save()")
         self.user_info()
 
         path = os.path.join(self.user_home, ".ssh")
 
-        self.create_directory(path, mode="0700")
+        self.create_directory(path, self.uid, self.gid, mode="0700")
 
         if isinstance(self.ssh_keys, dict):
             for key, value in self.ssh_keys.items():
@@ -1099,6 +1106,8 @@ class SshKeys(UsersHelper):
                     self.save_file(ssh_key_file, ssh_key_value)
 
                     self.change = True
+
+                self.set_rights(ssh_key_file, owner=self.uid, group=self.gid, mode="0600")
         else:
             self.module.log(msg=f"wrong ssh_keys format for user {self.user_name}")
 
@@ -1175,7 +1184,7 @@ class Sudoers(UsersHelper):
 
             content = self.content()
 
-            self.module.log(msg=f"  content {content}")
+            # self.module.log(msg=f"  content {content}")
 
             if not self.verify_files(self.file_name, content):
                 # changed keys
@@ -1459,6 +1468,9 @@ class MultiUsers():
                                     "msg": out
                                 })
 
+                    # self.module.log(msg=f"-> authorized_keys: {_authorized_keys}")
+                    # self.module.log(msg=f"-> _ssh_keys      : {_ssh_keys}")
+
                     if rc is not None and rc != 0:
                         res.update({
                             "failed": True,
@@ -1578,7 +1590,7 @@ def main():
     u = MultiUsers(module)
     result = u.run()
 
-    module.log(msg=f"= result : '{result}'")
+    # module.log(msg=f"= result : '{result}'")
 
     module.exit_json(**result)
 

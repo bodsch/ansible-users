@@ -27,7 +27,7 @@ class FilterModule(object):
         for u in users:
             username = u.get('username')
             user_state = u.get('state')
-            display.v(f"  - user : {username} / {user_state}")
+            display.vvv(f"  - user : {username} / {user_state}")
 
             if user_state == 'absent':
                 continue
@@ -36,7 +36,7 @@ class FilterModule(object):
                 try:
                     primary_group = g.get('ansible_facts').get('getent_group').get(username)
                     if primary_group:
-                        display.v(f"  - g : {primary_group[1]}")
+                        display.vvv(f"  - g : {primary_group[1]}")
                         u['primary_group'] = primary_group[1]
                 except Exception:
                     pass
@@ -62,12 +62,12 @@ class FilterModule(object):
         result = []
 
         for u in data:
-            display.v(f"{u}")
+            display.vvv(f"{u}")
 
             username = u.get("username", None)
             user_state = u.get("state", None)
 
-            display.v(f"  - user : {username} / {user_state}")
+            display.vvv(f"  - user : {username} / {user_state}")
 
             if user_state not in ["present", "absent", "lock"]:
                 result.append(username)

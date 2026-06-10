@@ -21,8 +21,8 @@ Tested on
 
 * Arch Linux
 * Debian based
-    - Debian 10 / 11 / 12
-    - Ubuntu 20.04 / 22.04
+    - Debian 10 / 11 / 12 / 13
+    - Ubuntu 20.04 / 22.04 / 24.04
 
 > **RedHat-based systems are no longer officially supported! May work, but does not have to.**
 
@@ -34,12 +34,6 @@ Tested on
 
 ```bash
 mkpasswd --method=SHA-512
-```
-
-* on RedHat - Use Python
-
-```bash
-python -c 'import crypt,getpass; print(crypt.crypt(getpass.getpass(), crypt.mksalt(crypt.METHOD_SHA512)))'
 ```
 
 
@@ -76,18 +70,23 @@ users: []
 | `username`                 |             | **required**  | username - no spaces                                           |
 | `uid`                      |             | optional      | The numerical value of the user's ID                           |
 | `state`                    | ` `         | **required**  | `present` / `absent` / `lock`                                  |
-| `password`                 | ` `         | optional      | sha512 encrypted password. If not set, password is set to `!`  |
+| `password`                 | ` `         | optional      | encrypted password hash (SHA-256 / SHA-512 / Blowfish). **MD5 hashes are rejected.** If not set, password is set to `!` |
 | `update_password`          | `always`    | optional      | `always` / `on_create`.<br>**NOTE**: when `always`, password will be change to password value.<br>If you are using `always` on an **existing** users, **make sure to have the password set**. |
 | `comment`                  | ` `         | optional      | Full name and Department or description of application (But you should set this!) |
 | `group`                    | ` `         | optional      | The primary Group for the User (The group **must exist** and will **not be created**!) |
-| `groups`                   | `[]`        | optional      | A list of groups the user will be added to (appended).<br>If group doesn't exist it will be created on the specific server. This is not the primary group (primary group is not modified) |
+| `groups`                   | `[]`        | optional      | A list of supplementary groups the user will be added to.<br>Groups that **do not exist are skipped with a warning** (they are **not** created). This is not the primary group (the primary group is not modified). |
 | `shell`                    | `/bin/bash` | optional      | path to login shell                                            |
+| `home`                     | `-`         | optional      | The user's home directory. Defaults to `/home/<username>`.     |
+| `create_home`              | `True`      | optional      | Create the home directory when the user is created.            |
+| `move_home`                | `False`     | optional      | Move the home directory when `home` changes.                   |
+| `expires`                  | ` `         | optional      | Account expiration date, given as a `struct_time`.             |
 | `authorized_key_directory` | `-`         | optional      | path for central stored ssh key e.g. `/etc/ssh/authorized_key` |
 | `authorized_keys`          | `[]`        | optional      | a list with authorized_keys. stored in `$HOME/.ssh/authorized_keys` or under `authorized_key_directory` |
 | `ssh_keys`                 | `{}`        | optional      | dictionary with varios ssh_keys. You can use this to deploy static public or private keyfiles                   |
 | `sudo`                     | `{}`        | optional      | a dictionary with sudo settings. (see below)                                            |
 | `remove`                   | `False`     | optional      | This only affects `state=absent`, it attempts to remove directories associated with the user. |
-| `password_lock`            | `True`      | optional      |  |
+| `force`                    | `False`     | optional      | This only affects `state=absent`, it forces removal of the user account (`userdel -f`). |
+| `password_lock`            | `True`      | optional      | Lock the account. When set, the account is locked even if a `password` hash is provided. |
 
 ### `ssh_keys`
 

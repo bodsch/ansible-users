@@ -1,19 +1,20 @@
 
 # Ansible Role:  `users`
 
-Role to manage multiple users on linux.
+Role to manage multiple users on linux.  
+Add users, change passwords, lock/unlock user accounts, manage sudo access (per user), add ssh key(s) for sshkey based authentication.
 
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bodsch/ansible-users/main.yml?branch=main)][ci]
-[![GitHub issues](https://img.shields.io/github/issues/bodsch/ansible-users)][issues]
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/bodsch/ansible-users)][releases]
+
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bodsch/ansible-users/build.yml?logo=github&branch=main)][ci]
+[![GitHub issues](https://img.shields.io/github/issues/bodsch/ansible-users?logo=github)][issues]
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/bodsch/ansible-users?logo=github)][releases]
 [![Ansible Downloads](https://img.shields.io/ansible/role/d/bodsch/users?logo=ansible)][galaxy]
 
 [ci]: https://github.com/bodsch/ansible-users/actions
 [issues]: https://github.com/bodsch/ansible-users/issues?q=is%3Aopen+is%3Aissue
 [releases]: https://github.com/bodsch/ansible-users/releases
-[galaxy]: https://galaxy.ansible.com/ui/standalone/roles/bodsch/users
+[galaxy]: https://galaxy.ansible.com/ui/standalone/roles/bodsch/users/
 
-Add users, change passwords, lock/unlock user accounts, manage sudo access (per user), add ssh key(s) for sshkey based authentication.
 
 ## Operating systems
 

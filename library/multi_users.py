@@ -1418,18 +1418,19 @@ class MultiUsers:
 
                     if _sudo:
                         sudo_state = sudoers.create_sudoers()
-
-                        sudo_changed = sudo_state.get("changed", False)
-                        sudo_failed = sudo_state.get("failed", False)
-
-                        res.update(
-                            {
-                                "changed": sudo_changed,
-                                "failed": sudo_failed,
-                            }
-                        )
                     else:
                         sudo_state = sudoers.delete_sudoers()
+
+                    # Merge the sudo result into the user result WITHOUT
+                    # discarding an already recorded user-level change or
+                    # failure (user creation must stay 'changed=True' even
+                    # when the sudo step reports no change).
+                    res["changed"] = res.get("changed", False) or sudo_state.get(
+                        "changed", False
+                    )
+                    res["failed"] = res.get("failed", False) or sudo_state.get(
+                        "failed", False
+                    )
 
                     if sudo_state:
                         res.update({"sudo": sudo_state})

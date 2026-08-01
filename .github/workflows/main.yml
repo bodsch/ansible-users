@@ -27,24 +27,26 @@ jobs:
       matrix:
         image:
           - archlinux:latest
-          - artixlinux:latest
         python_version:
           - "3.10"
           - "3.11"
+          - "3.12"
+          - "3.13"
+          - "3.14"
         ansible-version:
-          - "8.5"
+          - "13.0"
         scenario:
           - default
 
     steps:
       - name: check out the codebase.
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           path: 'ansible-users'
           ref: ${{ github.event.workflow_run.head_branch }}
 
       - name: 🐍 set up python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: "${{ matrix.python_version }}"
 
